@@ -1,0 +1,21 @@
+{
+  "name": "wananga-studio",
+  "private": true,
+  "type": "module",
+  "version": "1.0.0",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "dev": "sanity dev --host 127.0.0.1",
+    "build": "sanity build",
+    "deploy": "sanity deploy",
+    "seed:prepare": "node scripts/prepare-seed.mjs"
+  },
+  "dependencies": {
+    "sanity": "6.16.0",
+    "react": "^19.2.2",
+    "react-dom": "^19.2.2",
+    "styled-components": "^6.1.15"
+  }
+}
