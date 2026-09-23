@@ -5,6 +5,26 @@
 		<link rel="icon" type="image/svg+xml" href="/vite.svg" />
 		<meta name="generator" content="Hostinger Horizons" />
 		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<!-- Discover the hero before React loads, only on the homepage.
+		     Keep these candidates in sync with Home's picture element. -->
+		<script>
+			if (window.location.pathname === '/') {
+				const mobile = window.matchMedia('(max-width: 760px)').matches;
+				const preload = document.createElement('link');
+				preload.rel = 'preload';
+				preload.as = 'image';
+				preload.type = 'image/webp';
+				preload.fetchPriority = 'high';
+				preload.href = mobile
+					? '/images/bali-coast-mobile-v2.webp'
+					: '/images/bali-coast-2000-v2.webp';
+				if (!mobile) {
+					preload.imageSrcset = '/images/bali-coast-1200-v2.webp 1200w, /images/bali-coast-2000-v2.webp 2000w';
+					preload.imageSizes = 'calc(100vw - 48px)';
+				}
+				document.head.appendChild(preload);
+			}
+		</script>
 		<title></title>
 		<script async src="https://www.googletagmanager.com/gtag/js?id=G-EB3KXTX94Q"></script>
 		<script>

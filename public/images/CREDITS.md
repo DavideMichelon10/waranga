@@ -7,3 +7,8 @@ Le fotografie di paesaggio sono illustrative dei luoghi. Non raffigurano viaggi 
 
 Entrambe disponibili sotto Unsplash License al momento della consultazione (21 settembre 2026): https://unsplash.com/license
 File ottimizzati dal servizio immagini Unsplash, salvati nel progetto. Nessuna immagine generata con AI.
+
+Le varianti `bali-coast-1200-v2.webp`, `bali-coast-2000-v2.webp` e
+`bali-coast-mobile-v2.webp` derivano dagli originali di Simon Schafstall sopra
+indicati: ricompressione WebP locale per velocizzare la copertina, senza cambiare
+fotografia o inquadratura. Gli originali sono conservati.

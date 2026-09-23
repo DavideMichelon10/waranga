@@ -29,8 +29,8 @@ import pages from "./pages.json";
 import "./design.css";
 
 const media = {
-  coast: "/images/bali-coast-wide.webp",
-  coastMobile: "/images/bali-coast-mobile.webp",
+  coast: "/images/bali-coast-2000-v2.webp",
+  coastMobile: "/images/bali-coast-mobile-v2.webp",
   penida: "/images/nusa-penida.webp",
   people:
     "https://horizons-cdn.hostinger.com/356254a3-e909-4e6e-be23-5f7439e796ec/3x8a9240-2-pv6kY.JPG",
@@ -322,10 +322,13 @@ function Home() {
           <source media="(max-width: 760px)" srcSet={media.coastMobile} />
           <img
             src={media.coast}
+            srcSet="/images/bali-coast-1200-v2.webp 1200w, /images/bali-coast-2000-v2.webp 2000w"
+            sizes="calc(100vw - 48px)"
             alt="Le onde dell’oceano incontrano la costa verde di Kelingking, a Bali"
             width="2000"
             height="1499"
             fetchPriority="high"
+            loading="eager"
           />
         </picture>
         <div className="wa-container coast-hero-content">
