@@ -7,19 +7,30 @@ export const CONTENT_QUERY = `{
     "image": cover.asset->url, "imageAlt": cover.alt
   },
   "settings": *[_type == "siteSettings" && _id == "siteSettings"][0] {
-    homeTitle, homeIntro, tripsTitle, foundersText, contactEmail,
-    newsletterTitle, newsletterDescription
+    homeTitle, homeIntro, homePrimaryCta, tripsTitle, foundersText,
+    contactEmail, newsletterTitle, newsletterDescription, visionCta,
+    storyCta, tripCardCta, tripInterestCta, tripClosedCta, closingCta,
+    aboutIntro, aboutText
   }
 }`;
 
 export const defaultSettings = {
   homeTitle: "Il mondo,\ncon calma.",
   homeIntro: "Viaggi in piccoli gruppi con Riccardo e Ftima.\nTempo per scoprire, condividere, ritrovarsi.",
+  homePrimaryCta: "Scopri il primo viaggio",
   tripsTitle: "I nostri viaggi.",
   foundersText: "Scriviamo e viaggiamo. Wānanga nasce dal desiderio di condividere i luoghi che amiamo e il nostro modo di viverli.",
   contactEmail: "ciao@wananga.travel",
   newsletterTitle: "Ti scriviamo\nquando si parte.",
   newsletterDescription: "Novità sui viaggi e racconti da condividere. Iscriviti per riceverli via email.",
+  visionCta: "Scopri il nostro modo di viaggiare",
+  storyCta: "Scopri chi siamo",
+  tripCardCta: "Scopri il viaggio",
+  tripInterestCta: "Mi interessa questo viaggio",
+  tripClosedCta: "Avvisami delle prossime partenze",
+  closingCta: "Scopri i viaggi",
+  aboutIntro: "Il nostro modo di viaggiare",
+  aboutText: "A settembre 2022 abbiamo lasciato l’Italia con un biglietto di sola andata per l’Asia. Abbiamo lasciato il nostro appartamento in affitto e venduto le nostre auto.\n\nQuel primo anno ha dato il via alla nostra vita da nomadi digitali e da allora non abbiamo più smesso davvero di partire. Negli ultimi quattro anni abbiamo attraversato più di 34 Paesi, facendo base tra l’Italia e soprattutto l’Asia.\n\nCi sono luoghi nei quali siamo passati e altri nei quali, invece, abbiamo vissuto a lungo. Bali e la Thailandia, per esempio, sono diventate per noi qualcosa di molto diverso da una destinazione sulla mappa.\n\nSono diventate casa.\n\nWananga nasce da qui.",
 };
 
 export const bali = {

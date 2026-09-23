@@ -153,9 +153,7 @@ function Shell({ children }) {
             aria-label="Menu principale"
           >
             <NavLink to="/viaggi">I viaggi</NavLink>
-            <NavLink to="/il-nostro-modo-di-viaggiare">
-              Il nostro modo di viaggiare
-            </NavLink>
+            <NavLink to="/chi-siamo">Chi siamo</NavLink>
             <NavLink to="/domande">Domande</NavLink>
             <Button to="/viaggi">Parti con noi</Button>
           </nav>
@@ -196,7 +194,7 @@ function Shell({ children }) {
           </div>
           <div>
             <p className="footer-heading">Conosciamoci meglio</p>
-            <Link to="/il-nostro-modo-di-viaggiare">La nostra storia</Link>
+            <Link to="/chi-siamo">La nostra storia</Link>
             <Link to="/domande">Le tue domande</Link>
             <Link to="/newsletter">Newsletter</Link>
           </div>
@@ -269,7 +267,7 @@ function ContentState({ children }) {
   );
   return children;
 }
-function TripCard({ trip }) {
+function TripCard({ trip, settings }) {
   return (
     <article className="trip-card">
       <div className="trip-photo">
@@ -280,16 +278,16 @@ function TripCard({ trip }) {
         <h3>{trip.title}</h3>
         <p>{trip.summary}</p>
         <p className="departure-info">{trip.dateLabel}<br />{trip.price}</p>
-        <Button to={"/viaggi/" + trip.slug}>Scopri il viaggio</Button>
+        <Button to={"/viaggi/" + trip.slug}>{settings.tripCardCta}</Button>
       </div>
     </article>
   );
 }
 function TripList() {
-  const { trips } = useContent();
+  const { trips, settings } = useContent();
   return <ContentState>
     <div className="trip-catalog">
-      {trips.length ? trips.map((trip) => <TripCard key={trip.slug} trip={trip} />)
+      {trips.length ? trips.map((trip) => <TripCard key={trip.slug} trip={trip} settings={settings} />)
         : <p>Stiamo preparando i prossimi viaggi. <Link className="text-link" to="/newsletter">Ricevi le novità</Link>.</p>}
     </div>
   </ContentState>;
@@ -334,7 +332,7 @@ function Home() {
         <div className="wa-container coast-hero-content">
           <h1 id="home-title" className="preserve-lines">{settings.homeTitle}</h1>
           <p className="preserve-lines">{settings.homeIntro}</p>
-          <Button to="/viaggi">Scopri i viaggi</Button>
+          <Button to="/viaggi">{settings.homePrimaryCta}</Button>
         </div>
       </section>
       <section className="wa-container home-vision">
@@ -348,9 +346,7 @@ function Home() {
             Stare insieme, ma lasciare spazio anche a una passeggiata da soli. È
             così che immaginiamo ogni Wānanga.
           </p>
-          <Link to="/il-nostro-modo-di-viaggiare" className="text-link">
-            Il nostro modo di viaggiare
-          </Link>
+          <Button to="/chi-siamo" secondary>{settings.visionCta}</Button>
         </div>
       </section>
       <section className="wa-container home-departure">
@@ -372,9 +368,7 @@ function Home() {
               <br />e Ftima.
             </h2>
             <p className="preserve-lines">{settings.foundersText}</p>
-            <Button to="/il-nostro-modo-di-viaggiare" secondary>
-              La nostra storia
-            </Button>
+            <Button to="/chi-siamo" secondary>{settings.storyCta}</Button>
           </div>
         </div>
       </section>
@@ -445,11 +439,11 @@ function Trip() {
           <h3>Partiamo insieme?</h3>
           {acceptsRequests(trip) ? <>
             <p>Lascia una richiesta di interesse. Ti ricontatteremo per conoscerci e raccontarti i prossimi passi.</p>
-            <Button to={tripRequestPath(trip)}>Mi interessa questo viaggio</Button>
+            <Button to={tripRequestPath(trip)}>{settings.tripInterestCta}</Button>
             <small>Nessun pagamento. Nessun posto prenotato.</small>
           </> : <>
             <p>Al momento non raccogliamo richieste per questo viaggio.</p>
-            <Button to="/newsletter">Avvisami delle prossime partenze</Button>
+            <Button to="/newsletter">{settings.tripClosedCta}</Button>
           </>}
           <hr /><Link className="text-link" to="/contattaci">Hai una domanda? Scrivici <ArrowUpRight size={17} /></Link>
         </aside>
@@ -458,20 +452,18 @@ function Trip() {
   );
 }
 function Philosophy() {
+  const { settings } = useContent();
   return (
     <>
-      <Meta title="Il nostro modo di viaggiare" />
+      <Meta title="Chi siamo" />
       <section className="wa-section wa-container story-opening">
-        <p className="section-kicker">Il nostro modo di viaggiare</p>
+        <p className="section-kicker">{settings.aboutIntro}</p>
         <h1>
-          Il mondo fuori.
+          Chi siamo.
           <br />
-          Qualcosa che si muove dentro.
+          Wananga nasce da qui.
         </h1>
-        <p className="lead-text">
-          Wānanga nasce da una domanda semplice: e se ci concedessimo il tempo
-          di vivere davvero il viaggio?
-        </p>
+        <div className="lead-text"><Paragraphs text={settings.aboutText} /></div>
         <img src={media.people} alt="Riccardo e Ftima davanti al mare" />
       </section>
       <section className="wa-container story-body">
@@ -531,7 +523,7 @@ function Philosophy() {
         </div>
         <div className="closing-call">
           <h2>Partiamo insieme.</h2>
-          <Button to="/viaggi">Scopri i viaggi</Button>
+          <Button to="/viaggi">{settings.closingCta}</Button>
         </div>
       </section>
     </>
@@ -878,7 +870,7 @@ export default function Experience() {
           <Route path="/viaggi" element={<Trips />} />
           <Route path="/viaggi/:slug" element={<Trip />} />
           <Route path="/newsletter" element={<Newsletter />} />
-          <Route path="/il-nostro-modo-di-viaggiare" element={<Philosophy />} />
+          <Route path="/chi-siamo" element={<Philosophy />} />
           <Route path="/domande" element={<Questions />} />
           <Route path="/candidatura-bali" element={<Application />} />
           <Route path="/contattaci" element={<Contact />} />
@@ -886,7 +878,7 @@ export default function Experience() {
             <Route
               key={path}
               path={path}
-              element={<Navigate to="/il-nostro-modo-di-viaggiare" replace />}
+              element={<Navigate to="/chi-siamo" replace />}
             />
           ))}
           {["/bali"].map((path) => (
