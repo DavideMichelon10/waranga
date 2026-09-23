@@ -25,6 +25,8 @@ import pb from "../lib/pocketbaseClient";
 import { ContentProvider, useContent } from "../contexts/ContentContext";
 import { acceptsRequests, tripRequestPath } from "../lib/content";
 import ReachNewsletter from "../components/ReachNewsletter";
+import AgencyFooter from "../components/AgencyFooter";
+import WaitingList from "../components/WaitingList";
 import "./design.css";
 
 const media = {
@@ -51,13 +53,23 @@ function Mark({ full = false, alt }) {
     </span>
   );
 }
-function Button({ to, children, secondary = false }) {
+// Frame the spiral from the supplied logo artwork, preserving its original drawing.
+function BrandSymbol({ inverse = false }) {
+  return (
+    <span className={`brand-symbol${inverse ? " brand-symbol-inverse" : ""}`} aria-hidden="true">
+      <img src={`/images/wananga-logo-${inverse ? "orange" : "white"}.jpeg`} alt="" width="1600" height="900" />
+    </span>
+  );
+}
+
+function Button({ to, children, secondary = false, compact = false }) {
   return (
     <Link
-      className={`wa-button ${secondary ? "wa-button-secondary" : ""}`}
+      className={`wa-button ${secondary ? "wa-button-secondary" : ""} ${compact ? "wa-button-compact" : ""}`}
       to={to}
     >
-      {children}
+      <span>{children}</span>
+      {secondary && !compact && <ArrowUpRight size={18} aria-hidden="true" />}
     </Link>
   );
 }
@@ -118,7 +130,8 @@ function Shell({ children }) {
       </a>
       <header className="wa-header">
         <div className="wa-container header-inner">
-          <Link className="brand" to="/" aria-label={copy.brandLabel}>
+          <Link className="brand header-brand" to="/" aria-label={copy.brandLabel}>
+            <BrandSymbol />
             <Mark alt={copy.logoAlt} />
           </Link>
           <nav
@@ -129,6 +142,7 @@ function Shell({ children }) {
             <NavLink to="/viaggi">{copy.navTrips}</NavLink>
             <NavLink to="/chi-siamo">{copy.navAbout}</NavLink>
             <NavLink to="/domande">{copy.navQuestions}</NavLink>
+            <NavLink to="/contattaci">{copy.navContact}</NavLink>
             <Button to="/viaggi">{copy.navCta}</Button>
           </nav>
           <button
@@ -174,6 +188,7 @@ function Shell({ children }) {
           </div>
           <p className="footer-thought preserve-lines">{copy.footerMotto}</p>
         </div>
+        <AgencyFooter />
         <div className="wa-container footer-bottom">
           <span>© {new Date().getFullYear()} {copy.footerRights}</span>
           <div>
@@ -261,7 +276,7 @@ function TripList() {
   return <ContentState>
     <div className="trip-catalog">
       {trips.length ? trips.map((trip) => <TripCard key={trip.slug} trip={trip} settings={settings} />)
-        : <p>{settings.siteCopy.tripEmpty} <Link className="text-link" to="/newsletter">{settings.siteCopy.tripEmptyCta}</Link>.</p>}
+        : <div className="trip-empty"><p>{settings.siteCopy.tripEmpty}</p><Button secondary to="/newsletter">{settings.siteCopy.tripEmptyCta}</Button></div>}
     </div>
   </ContentState>;
 }
@@ -305,6 +320,7 @@ function Home() {
           />
         </picture>
         <div className="wa-container coast-hero-content">
+          <span className="hero-signature">{copy.brandMotto}</span>
           <h1 id="home-title" className="preserve-lines">{settings.homeTitle}</h1>
           <p className="preserve-lines">{settings.homeIntro}</p>
           <Button to="/viaggi/bali">{settings.homePrimaryCta}</Button>
@@ -312,10 +328,10 @@ function Home() {
       </section>
       <section className="wa-container home-vision">
         <h2 className="preserve-lines">{copy.homeVisionTitle}</h2>
-        <div>
+        <div className="home-vision-copy">
           <p>{copy.homeVisionText}</p>
-          <Button to="/chi-siamo" secondary>{settings.visionCta}</Button>
         </div>
+        <Button to="/chi-siamo" secondary>{settings.visionCta}</Button>
       </section>
       <section className="wa-container home-departure">
         <h2>{settings.tripsTitle}</h2>
@@ -340,13 +356,14 @@ function Home() {
       <section className="wa-container home-questions">
         <h2>{copy.homeQuestionsTitle}</h2>
         <FAQ />
-        <Link to="/domande" className="text-link">
+        <Button to="/domande" secondary>
           {copy.homeAllQuestions}
-        </Link>
+        </Button>
       </section>
       <section className="home-newsletter" id="aggiornamenti">
         <div className="wa-container newsletter-grid">
-          <div>
+          <div className="newsletter-intro">
+            <BrandSymbol inverse />
             <h2 className="preserve-lines">{settings.newsletterTitle}</h2>
             <p>{settings.newsletterDescription}</p>
           </div>
@@ -411,7 +428,7 @@ function Trip() {
             <p>{copy.tripUnavailableText}</p>
             <Button to="/newsletter">{settings.tripClosedCta}</Button>
           </>}
-          <hr /><Link className="text-link" to="/contattaci">{copy.tripContact} <ArrowUpRight size={17} /></Link>
+          <hr /><Button secondary to="/contattaci">{copy.tripContact}</Button>
         </aside>
       </section>
     </>
@@ -478,12 +495,17 @@ function SubmissionForm({ kind = "application", defaultMessage = "" }) {
   const { settings } = useContent();
   const copy = settings.siteCopy;
   const application = kind === "application";
+  const notesHintId = useId();
   const [status, setStatus] = useState("idle"),
     [error, setError] = useState("");
   const submit = async (e) => {
     e.preventDefault();
     const form = e.currentTarget;
-    if (!form.reportValidity() || status === "sending") return;
+    if (status === "sending") return;
+    for (const field of form.querySelectorAll('input[required]:not([type="checkbox"]), textarea[required]')) {
+      field.setCustomValidity(field.value.trim() ? "" : copy.formRequiredError);
+    }
+    if (!form.reportValidity()) return;
     const values = Object.fromEntries(new FormData(form));
     setStatus("sending");
     setError("");
@@ -491,7 +513,7 @@ function SubmissionForm({ kind = "application", defaultMessage = "" }) {
       nome: values.nome.trim(),
       email: values.email.trim(),
       privacy_accepted: values.privacy === "on",
-      consenso_newsletter: false,
+      consenso_newsletter: values.newsletter === "on",
     };
     if (application)
       Object.assign(payload, {
@@ -501,8 +523,13 @@ function SubmissionForm({ kind = "application", defaultMessage = "" }) {
         contatto_preferito: values.contatto_preferito,
         motivazione: values.motivazione.trim(),
         aspettative: "",
-        esperienza_gruppo: "",
-        info_utili: "",
+        esperienza_gruppo: values.esperienza_gruppo,
+        // The existing backend has no age field. Keep it with the applicant's
+        // information so it is saved without requiring a remote schema change.
+        info_utili: [
+          `Età: ${values.eta} anni`,
+          values.info_utili.trim(),
+        ].filter(Boolean).join("\n\n"),
       });
     else payload.messaggio = values.messaggio.trim();
     try {
@@ -532,83 +559,133 @@ function SubmissionForm({ kind = "application", defaultMessage = "" }) {
       </div>
     );
   return (
-    <form className="wa-form" onSubmit={submit}>
-      <div className="form-row">
-        <label>
-          {copy.formName}{application && ` ${copy.formFullName}`}
-          <input
-            name="nome"
-            autoComplete="name"
-            required
-            maxLength={120}
-            placeholder={application ? copy.formNameApplicationPlaceholder : copy.formNamePlaceholder}
-          />
-        </label>
-        <label>
-          {copy.formEmail}
-          <input
-            name="email"
-            type="email"
-            autoComplete="email"
-            required
-            placeholder={copy.formEmailPlaceholder}
-          />
-        </label>
-      </div>
-      {application && (
-        <>
-          <label>
-            {copy.formPhone}
-            <input
-              name="telefono"
-              type="tel"
-              autoComplete="tel"
-              required
-              maxLength={40}
-              placeholder={copy.formPhonePlaceholder}
-            />
-          </label>
+    <form className="wa-form" onSubmit={submit} onInput={(event) => event.target.setCustomValidity?.("")}>
+      <fieldset className="form-section">
+        {application && <legend><span className="form-section-number" aria-hidden="true">01</span>{copy.formPersonalSection}</legend>}
+        <div className="form-section-fields">
           <div className="form-row">
             <label>
-            {copy.formPeople}
-              <select name="numero_persone" required defaultValue="">
-                <option value="" disabled>
-                  {copy.formSelect}
-                </option>
-                {["1", "2", "3", "4", "5+"].map((n) => (
-                  <option key={n} value={n}>
-                    {n === "1" ? copy.formSolo : `${n} ${copy.formPeopleSuffix}`}
-                  </option>
-                ))}
-              </select>
+              <span>{copy.formName}{application && ` ${copy.formFullName}`} <span aria-hidden="true">*</span></span>
+              <input
+                name="nome"
+                autoComplete="name"
+                required
+                maxLength={120}
+                placeholder={application ? copy.formNameApplicationPlaceholder : copy.formNamePlaceholder}
+              />
             </label>
             <label>
-            {copy.formContactTime}
-              <select name="contatto_preferito" required defaultValue="">
-                <option value="" disabled>
-                  {copy.formSelect}
-                </option>
-                <option value="mattino">{copy.formMorning}</option>
-                <option value="pomeriggio">{copy.formAfternoon}</option>
-                <option value="sera">{copy.formEvening}</option>
-              </select>
+              <span>{copy.formEmail} <span aria-hidden="true">*</span></span>
+              <input
+                name="email"
+                type="email"
+                autoComplete="email"
+                required
+                placeholder={copy.formEmailPlaceholder}
+              />
             </label>
           </div>
-          <label>
-            {copy.formMotivation}
-            <textarea
-              name="motivazione"
-              rows={3}
-              maxLength={2000}
-              required
-              placeholder={copy.formMotivationPlaceholder}
-            />
-          </label>
+          {application && (
+            <div className="form-row">
+              <label>
+                <span>{copy.formPhone} <span aria-hidden="true">*</span></span>
+                <input
+                  name="telefono"
+                  type="tel"
+                  autoComplete="tel"
+                  required
+                  maxLength={40}
+                  placeholder={copy.formPhonePlaceholder}
+                />
+              </label>
+              <label>
+                <span>{copy.formAge} <span aria-hidden="true">*</span></span>
+                <input
+                  name="eta"
+                  type="number"
+                  inputMode="numeric"
+                  min={1}
+                  max={120}
+                  step={1}
+                  required
+                  placeholder={copy.formAgePlaceholder}
+                />
+              </label>
+            </div>
+          )}
+        </div>
+      </fieldset>
+      {application && (
+        <>
+          <fieldset className="form-section form-section-separated">
+            <legend><span className="form-section-number" aria-hidden="true">02</span>{copy.formTripSection}</legend>
+            <div className="form-section-fields">
+              <div className="form-row">
+                <label>
+                  <span>{copy.formPeople} <span aria-hidden="true">*</span></span>
+                  <select name="numero_persone" required defaultValue="">
+                    <option value="" disabled>{copy.formSelect}</option>
+                    {["1", "2", "3", "4", "5+"].map((n) => (
+                      <option key={n} value={n}>
+                        {n === "1" ? copy.formSolo : `${n} ${copy.formPeopleSuffix}`}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  <span>{copy.formContactTime} <span aria-hidden="true">*</span></span>
+                  <select name="contatto_preferito" required defaultValue="">
+                    <option value="" disabled>{copy.formSelect}</option>
+                    <option value="mattino">{copy.formMorning}</option>
+                    <option value="pomeriggio">{copy.formAfternoon}</option>
+                    <option value="sera">{copy.formEvening}</option>
+                  </select>
+                </label>
+              </div>
+              <label>
+                <span>{copy.formMotivation} <span aria-hidden="true">*</span></span>
+                <textarea
+                  name="motivazione"
+                  rows={4}
+                  maxLength={2000}
+                  required
+                  placeholder={copy.formMotivationPlaceholder}
+                />
+              </label>
+              <fieldset className="form-choice-group">
+                <legend>{copy.formGroupExperience} <span aria-hidden="true">*</span></legend>
+                <div className="form-choices">
+                  {[["Sì", copy.formYes], ["No", copy.formNo]].map(([value, label]) => (
+                    <label key={value} className="form-choice">
+                      <input type="radio" name="esperienza_gruppo" value={value} required />
+                      <span>{label}</span>
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+            </div>
+          </fieldset>
+          <fieldset className="form-section form-section-separated">
+            <legend><span className="form-section-number" aria-hidden="true">03</span>{copy.formNotesSection}</legend>
+            <div className="form-section-fields">
+              <label>
+                <span>{copy.formUsefulInfo} <span className="form-optional">({copy.formOptional.toLowerCase()})</span></span>
+                <span id={notesHintId} className="form-field-hint">{copy.formUsefulInfoHint}</span>
+                <textarea
+                  name="info_utili"
+                  rows={3}
+                  maxLength={1900}
+                  aria-describedby={notesHintId}
+                  placeholder={copy.formUsefulInfoPlaceholder}
+                />
+              </label>
+            </div>
+          </fieldset>
         </>
       )}
       {!application && (
         <label>
-          {copy.formMessage}
+          <span>{copy.formMessage} <span aria-hidden="true">*</span></span>
           <textarea
             name="messaggio"
             defaultValue={defaultMessage}
@@ -626,10 +703,13 @@ function SubmissionForm({ kind = "application", defaultMessage = "" }) {
           <Link to="/privacy-policy" target="_blank">
             {copy.formPrivacyLink}
           </Link>{" "}
-          {copy.formPrivacyTail}
+          {copy.formPrivacyTail} <span aria-hidden="true">*</span>
         </span>
       </label>
-      <p className="form-note">{copy.formNewsletterNote} <Link className="text-link" to="/newsletter">{copy.formNewsletterLink}</Link>.</p>
+      <label className="check-label">
+        <input name="newsletter" type="checkbox" />
+        <span>{copy.formNewsletterConsent}</span>
+      </label>
       {error && (
         <p className="form-error" role="alert">
           {error}
@@ -686,7 +766,7 @@ function Application() {
             <div>
               <strong>{trip.title}, {trip.destination}</strong>
               <small>{trip.dateLabel}</small>
-              <Link to="/viaggi/bali">{copy.applicationReview}</Link>
+              <Button secondary compact to="/viaggi/bali">{copy.applicationReview}</Button>
             </div>
           </div>
           <ol className="next-steps">
@@ -717,8 +797,8 @@ function Contact() {
           <p className="section-kicker">{copy.contactKicker}</p>
           <h1 className="preserve-lines">{copy.contactTitle}</h1>
           <p className="lead-text">{copy.contactIntro}</p>
-          <a className="text-link" href={"mailto:" + settings.contactEmail}>
-            {settings.contactEmail} <ArrowUpRight size={18} />
+          <a className="wa-button wa-button-secondary contact-email-button" href={"mailto:" + settings.contactEmail}>
+            <span>{settings.contactEmail}</span> <ArrowUpRight size={18} aria-hidden="true" />
           </a>
         </div>
         <div className="form-panel">
@@ -787,6 +867,7 @@ export default function Experience() {
           <Route path="/viaggi" element={<Trips />} />
           <Route path="/viaggi/:slug" element={<Trip />} />
           <Route path="/newsletter" element={<Newsletter />} />
+          <Route path="/waiting-list/:slug" element={<WaitingList />} />
           <Route path="/chi-siamo" element={<Philosophy />} />
           <Route path="/domande" element={<Questions />} />
           <Route path="/candidatura-bali" element={<Application />} />

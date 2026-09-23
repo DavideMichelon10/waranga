@@ -1,3 +1,4 @@
+import { OpenWaitingListAction, DuplicateWaitingListAction } from "./waitlistActions.jsx";
 import { defineConfig } from "sanity";
 import { structureTool } from "sanity/structure";
 import { schemaTypes } from "./schemaTypes.js";
@@ -11,6 +12,7 @@ export default defineConfig({
   plugins: [structureTool({
     structure: (S) => S.list().title("Gestisci il sito").items([
       S.documentTypeListItem("trip").title("Viaggi"),
+      S.documentTypeListItem("waitlist").title("Liste d’attesa"),
       S.listItem().title("Testi del sito").child(
         S.document().schemaType("siteSettings").documentId("siteSettings").title("Testi del sito"),
       ),
@@ -24,6 +26,8 @@ export default defineConfig({
     newDocumentOptions: (options) => options.filter((item) => item.templateId !== "siteSettings"),
     actions: (actions, context) => context.schemaType === "siteSettings"
       ? actions.filter((item) => !["duplicate", "delete", "unpublish"].includes(item.action))
-      : actions,
+      : context.schemaType === "waitlist"
+        ? [...actions.filter(item => item.action !== "duplicate"), OpenWaitingListAction, DuplicateWaitingListAction]
+        : actions,
   },
 });

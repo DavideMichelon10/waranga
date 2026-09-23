@@ -1,5 +1,7 @@
+import { waitlistSchema } from "./waitlistSchema.js";
 import { defineArrayMember, defineField, defineType } from "sanity";
 import { defaultSettings } from "../src/lib/content.js";
+import { initialSiteSettings } from "./siteSettingsDefaults.js";
 
 const textField = (name, title, required = false, rows = 4) => defineField({
   name, title, type: "text", rows,
@@ -121,7 +123,7 @@ const trip = defineType({
 });
 const siteSettings = defineType({
   name: "siteSettings", title: "Testi del sito", type: "document",
-  initialValue: { faq: defaultSettings.faq, siteCopy: defaultSettings.siteCopy },
+  initialValue: initialSiteSettings,
   fields: [
     textField("homeTitle", "Titolo principale della homepage", false, 2),
     textField("homeIntro", "Presentazione della homepage", false, 3),
@@ -155,4 +157,4 @@ const siteSettings = defineType({
   ],
   preview: { prepare: () => ({ title: "Testi del sito Wānanga" }) },
 });
-export const schemaTypes = [trip, siteSettings];
+export const schemaTypes = [trip, waitlistSchema, siteSettings];

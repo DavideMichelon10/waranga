@@ -11,6 +11,10 @@ Con Node.js 22.12 o successivo:
 
 Per verificare la versione di produzione: `npm run build`.
 Il frontend è in `src/`, il pannello Sanity in `studio/`.
+Durante `npm run dev`, le letture pubbliche di Sanity passano dal proxy locale
+Vite `/__sanity`: l'anteprima funziona anche senza autorizzare localhost in Sanity.
+Il proxy non inoltra cookie o credenziali. La build di produzione continua a
+leggere direttamente Sanity e richiede le origini pubbliche autorizzate.
 Non caricare file `.env`, credenziali o database nel repository.
 
 ## Stato dell'integrazione
@@ -18,10 +22,10 @@ Non caricare file `.env`, credenziali o database nel repository.
 - Project ID Sanity: v6jdx1wm. Dataset pubblico: production.
 - Il sito legge SOLO i documenti pubblicati, senza token e senza credenziali.
 - Catalogo /viaggi e pagine /viaggi/:slug generati dai contenuti Sanity.
-- Il pannello Studio include Viaggi e Testi del sito, con campi in italiano.
-- I testi modificabili sono: titolo e introduzione home, titolo viaggi, presentazione fondatori in home, email di contatto e presentazione newsletter. Le altre pagine restano nel codice.
-- La newsletter è predisposta per il link pubblico di un modulo Hostinger Reach.
-- Il link Reach è da aggiungere più avanti, come concordato. Nel frattempo non vengono raccolte iscrizioni e non viene mostrato un successo fittizio.
+- Il pannello Studio locale e remoto include Viaggi, Liste d’attesa e Testi del sito, con campi in italiano. Studio remoto aggiornato il 23 settembre 2026; frontend e Functions restano da pubblicare.
+- Testi del sito include i testi delle pagine, i pulsanti, le etichette dei moduli e le domande frequenti con le risposte. I valori iniziali corrispondono ai testi già mostrati sul sito.
+- La newsletter mostra un modulo con sola email in homepage e su /newsletter.
+- Il collegamento Reach è in standby: con REACH_ENABLED=false nessun indirizzo viene inviato o salvato.
 - Studio pubblicato: https://wananga-v6jdx1wm.sanity.studio/
 - Dominio frontend autorizzato in Sanity: https://wananga.it (anche https://www.wananga.it)
 - Bali (con fotografia) e Testi del sito sono già stati importati come bozze. Accedere al pannello con GitHub, rivederli e premere Publish.
@@ -51,18 +55,16 @@ non contiene database PocketBase, credenziali, node_modules o dati dei contatti.
 Il sito definitivo è https://wananga.it e la lettura dei contenuti Sanity da
 questo dominio (e da www.wananga.it) è già autorizzata.
 
-Per un aggiornamento manuale: estrarre wananga-netlify-pubblicazione.zip e
-trascinare la cartella contenente index.html nella sezione Deploys del progetto
-Netlify esistente. Non creare un nuovo sito: avrebbe un dominio diverso.
+La configurazione `netlify.toml` include frontend e funzioni server. Per una futura
+pubblicazione completa usare un deploy che includa le Functions e Netlify Blobs
+(ad esempio dal repository collegato). Il solo upload della cartella `dist`
+contiene il sito statico e **non installa il backend della waiting list**.
 
-Per i deploy da GitHub: collegare DavideMichelon10/waranga al progetto Netlify
-esistente, branch main. Directory principale: radice del repository.
-Build npm run build, output dist. Il netlify.toml contiene già questi valori.
-Il push su GitHub da solo non collega automaticamente il sito a Netlify.
-
-Reach si attiva con VITE_REACH_FORM_URL nelle variabili di build Netlify
-(oppure in .env.local per una build manuale), poi una nuova build.
-Un archivio già compilato non legge le variabili impostate dopo la compilazione.
+Build: `npm run build`; output: `dist`; funzioni: `netlify/functions`.
+Non è stato effettuato alcun push. Il solo Studio Sanity è stato pubblicato su richiesta; il frontend e le Functions restano locali.
+Le funzioni server richiedono la configurazione descritta in [WAITING-LISTS.md](WAITING-LISTS.md).
+Hostinger statico può ospitare il frontend, ma non esegue queste Netlify Functions:
+per quel tipo di hosting occorre adattare il backend.
 
 ## Avviare il pannello
 
@@ -116,21 +118,27 @@ Per aggiungere una destinazione: Viaggi > Nuovo > compila i campi > genera lo sl
 aggiungi le tappe > Publish. Lo slug diventa /viaggi/nome-del-viaggio.
 "Completo" e "Richieste chiuse" disabilitano l'invito a candidarsi.
 
-## Attivare Hostinger Reach quando sarà pronto
+## Waiting list e newsletter con Hostinger Reach
 
-In Reach creare un modulo, verificare la lista e i testi di iscrizione e attivarlo.
-Copiare il link pubblico dell'opzione Share/Condividi.
+Implementati i moduli di iscrizione e le rotte server `/api/waitlist` e `/api/newsletter`. La connessione resta disabilitata finché mancano le
+credenziali e `REACH_ENABLED=true`: il modulo mostra l’indisponibilità solo dopo
+il tentativo di invio e non simula un’iscrizione riuscita.
 
-Impostare nelle variabili di build Hostinger:
+Da Sanity si possono creare e duplicare pagine `/waiting-list/:slug`, modificare
+foto e testi e collegare il viaggio definitivo. La waiting list richiede email
+e consenso per l’avviso; la newsletter generale ha un consenso separato,
+facoltativo e inizialmente non selezionato.
 
-    VITE_REACH_FORM_URL=https://LINK-PUBBLICO-DEL-VOSTRO-MODULO
+Il backend aggiunge un tag Reach per ogni partenza e `wananga-newsletter` solo
+su richiesta. I contatti restano in Reach; la prova dei consensi è conservata
+in Netlify Blobs privato, mai nel dataset pubblico Sanity.
 
-Poi eseguire un nuovo deploy.
-Il sito mostra un pulsante in homepage e su /newsletter che apre il modulo ufficiale.
-Il modulo Reach gestisce l'iscrizione e la sua conferma: il sito non dichiara
-l'utente iscritto al semplice clic. Il modulo non è ancora incorporato nella pagina.
-I contatti e gli invii si gestiscono in Reach, non nel dataset pubblico Sanity.
-Verificare un'iscrizione di prova nella lista reale prima di annunciare la newsletter.
+Il sito salva i contatti e le preferenze in Reach. Non crea campagne, bozze email,
+né invia email. La pubblicazione o modifica di un viaggio non contatta gli iscritti.
+
+Guida editoriale e configurazione: [WAITING-LISTS.md](WAITING-LISTS.md).
+Lista Bali: http://localhost:4173/waiting-list/bali-prossima-partenza.
+Le vecchie variabili `VITE_NEWSLETTER_ENDPOINT` e `VITE_REACH_FORM_URL` non sono usate.
 
 ## Moduli di contatto e candidature
 
@@ -144,8 +152,21 @@ Per questo:
 - gli altri viaggi aprono /contattaci con il nome del viaggio nel messaggio e salvano
   nella collezione contatti, senza inventare valori non supportati dal backend.
 
-La casella newsletter dei vecchi moduli è stata sostituita da un link al percorso Reach.
-Inviare un contatto non iscrive automaticamente alla newsletter.
+La candidatura raccoglie nome, email, telefono, età, numero di persone,
+fascia oraria di contatto, motivazione e precedente esperienza di gruppo (Sì/No).
+Questi campi sono obbligatori; le note sulle esigenze personali sono facoltative.
+Il backend originale non ha un campo età: il valore viene conservato in
+`info_utili` come “Età: … anni”, seguito dalle eventuali note (massimo 1900
+caratteri, per rispettare il limite complessivo di 2000 del campo).
+La risposta Sì/No viene salvata in `esperienza_gruppo`.
+
+Entrambi i moduli richiedono la casella dell'informativa privacy e offrono una
+casella newsletter facoltativa, inizialmente non selezionata. La scelta viene
+inclusa nel payload PocketBase come consenso_newsletter (true/false).
+Il frontend non chiama Reach da questi moduli: il collegamento resta in standby.
+Quando verrà configurato il backend, verificare che la sincronizzazione Reach
+avvenga solo per chi ha espresso il consenso. Il vecchio backend Horizons può
+avere hook di sincronizzazione propri, da controllare prima di ricollegarlo.
 
 Finché il backend non è disponibile sul dominio pubblicato, questi due moduli
 non possono inviare: mostrano l'errore e conservano il testo, senza simulare successo.
@@ -157,5 +178,45 @@ In questo repository:
 - src/lib/content.js: query, dati iniziali e normalizzazione.
 - src/contexts/ContentContext.jsx: caricamento contenuti pubblicati.
 - src/redesign/Experience.jsx: pagine e catalogo.
-- src/components/ReachNewsletter.jsx: accesso al modulo Reach.
+- src/components/ReachNewsletter.jsx: modulo newsletter con sola email.
+- src/lib/newsletter.js: chiamate ai moduli email sul backend.
+- src/components/WaitingList.jsx e studio/waitlistSchema.js: pagine social e campi editoriali.
+- server/ e netlify/functions/: raccolta contatti Reach e consensi.
 - studio/schemaTypes.js: campi editoriali.
+
+## Dati dell’agenzia nel footer
+
+`src/components/AgencyFooter.jsx` riporta in forma compatta i dati essenziali di The Blue Wizards s.r.l. ·
+Magical Journeys forniti dal proprietario del sito. Il proprietario ha confermato
+che la società è l’organizzatore dei viaggi Wānanga, stipula i contratti e gestisce
+i pagamenti. Nel footer sono mantenuti organizzatore, sede legale, P.IVA/C.F.,
+Registro Imprese, capitale sociale e versato e PEC. Le descrizioni promozionali,
+il codice attività e il REA sono stati rimossi per ridurre il blocco.
+
+Prima della pubblicazione, far confermare all’agenzia: dati della visura e capitale
+versato aggiornati, eventuale socio unico o liquidazione,
+estremi autorizzativi applicabili, recapiti operativi,
+assicurazione RC e protezione dall’insolvenza. Il footer non sostituisce le
+condizioni di viaggio e le informative: privacy, cookie e termini nel progetto
+sono ancora segnaposto. Va identificato anche il soggetto che gestisce il sito
+e tratta i dati raccolti dai moduli. Non è stata svolta una verifica della visura.
+
+## Compilare i campi editoriali già esistenti
+
+I valori iniziali dello schema si applicano solo ai documenti nuovi. Per completare
+un documento Testi del sito creato prima dell’aggiunta di FAQ e altri testi,
+dalla cartella `studio` verificare prima i campi mancanti:
+
+    npx sanity exec scripts/backfill-site-settings.mjs --with-user-token
+
+Per applicare il riempimento:
+
+    npx sanity exec scripts/backfill-site-settings.mjs --with-user-token -- --apply
+
+Lo script usa gli stessi testi predefiniti del sito e aggiorna solo la bozza.
+Conserva testi personalizzati, domande esistenti e un elenco FAQ svuotato
+esplicitamente. Se esiste solo il documento pubblicato, ne crea una bozza
+completa. Può essere ripetuto senza duplicare le domande; una modifica concorrente
+alla bozza interrompe l’aggiornamento. Non pubblica automaticamente.
+Aprire **Testi del sito** per modificare i testi già compilati e premere **Publish**
+quando le modifiche devono apparire sul sito.

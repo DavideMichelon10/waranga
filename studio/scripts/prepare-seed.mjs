@@ -1,7 +1,8 @@
 import { writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
+import { initialSiteSettings } from "../siteSettingsDefaults.js";
 const monorepoContent = new URL("../../apps/web/src/lib/content.js", import.meta.url);
-const { bali, defaultSettings } = await import(existsSync(monorepoContent)
+const { bali } = await import(existsSync(monorepoContent)
   ? monorepoContent.href : new URL("../../src/lib/content.js", import.meta.url).href);
 
 // Prepared locally only: importing into an account is an explicit separate step.
@@ -12,7 +13,7 @@ await writeFile(new URL("../seed.ndjson", import.meta.url), [
     slug: { _type: "slug", current: "bali" },
     itinerary: trip.itinerary.map((step, i) => ({ ...step, _type: "itineraryStep", _key: "bali-" + i })),
   },
-  { ...defaultSettings, _id: "drafts.siteSettings", _type: "siteSettings" },
+  { ...initialSiteSettings(), _id: "drafts.siteSettings", _type: "siteSettings" },
 ].map((doc) => JSON.stringify(doc)).join("\n") + "\n");
 console.log("Bozze preparate in studio/seed.ndjson. Nessun dato inviato a Sanity.");
 console.log("Dopo l’importazione carica la fotografia di Bali, verifica i contenuti e pubblica.");

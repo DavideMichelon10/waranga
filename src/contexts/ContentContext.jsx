@@ -10,7 +10,7 @@ export function ContentProvider({ children }) {
   const configured = Boolean(projectId);
   const [attempt, setAttempt] = useState(0);
   const [state, setState] = useState({
-    trips: configured ? [] : [bali], settings: defaultSettings,
+    trips: configured ? [] : [bali], settings: defaultSettings, waitlists: [],
     status: configured ? "loading" : "ready",
   });
   const retry = useCallback(() => setAttempt((value) => value + 1), []);
@@ -24,7 +24,10 @@ export function ContentProvider({ children }) {
       activeController = controller;
       const timeout = setTimeout(() => controller.abort(), 15000);
       try {
-        const content = await fetchContent({ projectId, dataset, signal: controller.signal });
+        const content = await fetchContent({
+          projectId, dataset, signal: controller.signal,
+          useLocalProxy: import.meta.env.DEV,
+        });
         if (!disposed) setState({ ...content, status: "ready" });
       } catch {
         // Do not resurrect an unpublished/removed trip using local fallback.

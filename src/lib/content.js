@@ -1,5 +1,7 @@
+import { WAITLIST_QUERY, slugValid } from "./waitlists.js";
 // Public editorial content only. Never store subscribers or applications here.
 export const CONTENT_QUERY = `{
+  "waitlists": ${WAITLIST_QUERY},
   "trips": *[_type == "trip" && defined(slug.current)] | order(order asc, title asc) {
     _id, title, "slug": slug.current, destination, headline, summary,
     dateLabel, duration, group, price, flight, description, beforeBooking,
@@ -40,8 +42,8 @@ export const defaultSettings = {
     { question: "Come sono organizzate le camere?", answer: "Le sistemazioni e le modalità di condivisione saranno indicate nel programma definitivo. Raccontaci eventuali preferenze quando ci sentiamo, così potremo verificarle insieme." },
   ],
   siteCopy: {
-    brandName: "WĀNANGA", logoAlt: "Wānanga — viaggi, persone, vita", brandLabel: "Wānanga, homepage", skipToContent: "Vai al contenuto", menuLabel: "Menu principale", menuOpen: "Apri menu", menuClose: "Chiudi menu",
-    navTrips: "I viaggi", navAbout: "Chi siamo", navQuestions: "Domande", navCta: "Parti con noi",
+    brandName: "WĀNANGA", brandMotto: "viaggi, persone, vita.", logoAlt: "Wānanga — viaggi, persone, vita", brandLabel: "Wānanga, homepage", skipToContent: "Vai al contenuto", menuLabel: "Menu principale", menuOpen: "Apri menu", menuClose: "Chiudi menu",
+    navTrips: "I viaggi", navAbout: "Chi siamo", navQuestions: "Domande", navContact: "Scrivi a Wānanga", navCta: "Parti con noi",
     footerContactTitle: "Ci trovi qui", footerContact: "Scrivici", footerAboutTitle: "Conosciamoci meglio",
     footerStory: "La nostra storia", footerQuestions: "Le tue domande", footerNewsletter: "Newsletter",
     footerMotto: "Il mondo è grande.\nFacciamogli spazio.", footerRights: "Wānanga", footerByline: "Con Riccardo e Ftima",
@@ -75,17 +77,30 @@ export const defaultSettings = {
     newsletterMetaTitle: "Newsletter", newsletterSignup: "Iscriviti alla newsletter Wānanga. Puoi cancellare l’iscrizione in qualsiasi momento.",
     newsletterButton: "Iscriviti alla newsletter", newsletterNewTab: "Si apre il nostro modulo di iscrizione in una nuova scheda.",
     newsletterUnavailable: "Le iscrizioni alla newsletter apriranno presto. Torna a trovarci per le prossime novità.",
+    newsletterEmailLabel: "La tua email", newsletterEmailPlaceholder: "nome@esempio.it",
+    newsletterConsent: "Iscrivendoti accetti di ricevere la newsletter Wānanga. Puoi cancellarti quando vuoi. Consulta la nostra",
+    newsletterSending: "Iscrizione in corso…", newsletterSuccess: "Sei iscritto! Ti scriveremo con le prossime novità.",
+    newsletterConfirm: "Controlla la tua casella email per confermare l’iscrizione.",
+    newsletterError: "Non siamo riusciti a completare l’iscrizione. Riprova tra poco.",
     newsletterPageTitle: "Newsletter",
     formSuccessTitle: "La tua richiesta è arrivata.", formSuccessText: "Grazie per averci scritto. Ti ricontatteremo ai recapiti che hai lasciato.",
     formSuccessApplication: "Non è una prenotazione: definiremo insieme i prossimi passi.",
     formName: "Nome", formFullName: "e cognome", formNameApplicationPlaceholder: "Come ti chiami?", formNamePlaceholder: "Il tuo nome",
-    formEmail: "Email", formEmailPlaceholder: "La tua email", formPhone: "Telefono", formPhonePlaceholder: "Per conoscerci con una telefonata",
+    formEmail: "Email", formEmailPlaceholder: "La tua email", formPhone: "Telefono", formPhonePlaceholder: "+39 333 1234567",
     formPeople: "Quante persone?", formSelect: "Seleziona", formSolo: "Parto da solo/a", formPeopleSuffix: "persone",
     formContactTime: "Quando possiamo sentirci?", formMorning: "Al mattino", formAfternoon: "Nel pomeriggio", formEvening: "La sera",
-    formMotivation: "Che cosa cerchi in questo viaggio?", formMotivationPlaceholder: "Bastano poche parole. Ci aiutano a conoscerti.",
+    formMotivation: "Perché vuoi partire per questo viaggio?", formMotivationPlaceholder: "Cosa ti ha incuriosito? Raccontaci cosa ti spinge a partire e cosa vorresti vivere.",
+    formPersonalSection: "Un po’ di te", formTripSection: "Il viaggio, insieme", formNotesSection: "Le tue esigenze",
+    formAge: "Età", formAgePlaceholder: "La tua età in anni",
+    formGroupExperience: "Hai mai fatto un viaggio di gruppo?", formYes: "Sì", formNo: "No",
+    formUsefulInfo: "C’è qualcosa che dobbiamo sapere?", formOptional: "Facoltativo",
+    formUsefulInfoHint: "Ad esempio esigenze di salute, allergie o necessità particolari. Condividi solo ciò che desideri farci sapere.",
+    formUsefulInfoPlaceholder: "Se ti va, raccontacelo qui…",
     formMessage: "Il tuo messaggio", formMessagePlaceholder: "Come possiamo aiutarti?", formPrivacyLead: "Ho letto l’",
     formPrivacyLink: "informativa privacy", formPrivacyTail: "e acconsento al trattamento dei dati per questa richiesta.",
     formNewsletterNote: "Vuoi ricevere anche le novità?", formNewsletterLink: "Iscriviti alla newsletter",
+    formRequiredError: "Compila questo campo.",
+    formNewsletterConsent: "Desidero ricevere via email la newsletter Wānanga con novità sui viaggi e racconti. Potrò cancellarmi in qualsiasi momento (facoltativo).",
     formValidationError: "Controlla i campi del modulo e riprova.", formSaveError: "Non siamo riusciti a salvare la richiesta. I tuoi dati sono ancora qui: riprova tra poco.",
     formSending: "Invio in corso", formApplicationSubmit: "Invia la richiesta", formContactSubmit: "Invia il messaggio",
     formApplicationNote: "Invii una richiesta di interesse per Bali. Non prenoti un posto e non è richiesto un pagamento.",
@@ -94,7 +109,7 @@ export const defaultSettings = {
     applicationIntro: "Ti incuriosisce Bali? Raccontaci qualcosa di te.",
     applicationDescription: "Ti ricontatteremo per parlare del viaggio, delle prossime date e delle tue domande. Senza impegno.",
     applicationReview: "Rivedi il viaggio", applicationStep1: "Ci lasci la tua richiesta.", applicationStep2: "Ci sentiamo per conoscerci.",
-    applicationStep3: "Decidi con tutte le informazioni.", applicationFormTitle: "Piacere di conoscerti.", applicationFormNote: "I campi del modulo sono richiesti.",
+    applicationStep3: "Decidi con tutte le informazioni.", applicationFormTitle: "Piacere di conoscerti.", applicationFormNote: "I campi con * sono obbligatori. Le informazioni aggiuntive sono facoltative.",
     contactMetaTitle: "Scrivici", contactMetaDescription: "Contatta Wānanga per informazioni sul viaggio a Bali e sulle prossime partenze.", contactKicker: "Parliamone", contactTitle: "Ogni viaggio parte\nda una domanda.",
     contactIntro: "Siamo qui per la tua.", contactFormTitle: "Scrivi a Wānanga.", contactMessageDefault: "Vorrei informazioni sul viaggio ",
     questionsMetaTitle: "Le tue domande", questionsMetaDescription: "Le risposte su viaggi Wānanga, voli, camere, prossime partenze e richieste di partecipazione.", questionsKicker: "Facciamo chiarezza", questionsTitle: "Prima di partire.",
@@ -182,11 +197,20 @@ export function normalizeContent(result) {
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(settings.contactEmail)) {
     settings.contactEmail = defaultSettings.contactEmail;
   }
-  return { trips, settings };
+  const waitlistSlugs = new Set();
+  const waitlists = (Array.isArray(result.waitlists) ? result.waitlists : []).filter((item) => {
+    if (!item?._id || !item.title || !slugValid(item.slug) || waitlistSlugs.has(item.slug)) return false;
+    waitlistSlugs.add(item.slug);
+    return true;
+  }).map((item) => ({ ...item, image: httpsUrl(item.image) }));
+  return { trips, settings, waitlists };
 }
 
-export async function fetchContent({ projectId, dataset, signal, fetcher = fetch }) {
-  const response = await fetcher(queryUrl(projectId, dataset), {
+export async function fetchContent({ projectId, dataset, signal, fetcher = fetch, useLocalProxy = false }) {
+  const url = queryUrl(projectId, dataset);
+  const parsed = new URL(url);
+  const requestUrl = useLocalProxy ? `/__sanity${parsed.pathname}${parsed.search}` : url;
+  const response = await fetcher(requestUrl, {
     signal, credentials: "omit", cache: "no-store",
   });
   if (!response.ok) throw new Error("Sanity HTTP " + response.status);

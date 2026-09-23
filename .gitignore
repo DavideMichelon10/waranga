@@ -7,3 +7,5 @@ dist/
 .sanity/
 .DS_Store
 *.log
+
+.netlify/
