@@ -399,7 +399,7 @@ function Paragraphs({ text }) {
 }
 function Trip() {
   const { slug } = useParams();
-  const { trips, status } = useContent();
+  const { trips, settings, status } = useContent();
   const trip = trips.find((item) => item.slug === slug);
   if (status !== "ready") return <section className="wa-section wa-container"><ContentState /></section>;
   if (!trip) return <NotFound />;
