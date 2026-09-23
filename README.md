@@ -23,7 +23,7 @@ Non caricare file `.env`, credenziali o database nel repository.
 - La newsletter è predisposta per il link pubblico di un modulo Hostinger Reach.
 - Il link Reach è da aggiungere più avanti, come concordato. Nel frattempo non vengono raccolte iscrizioni e non viene mostrato un successo fittizio.
 - Studio pubblicato: https://wananga-v6jdx1wm.sanity.studio/
-- Dominio frontend autorizzato in Sanity: https://gleeful-malabi-0cc11f.netlify.app
+- Dominio frontend autorizzato in Sanity: https://wananga.it (anche https://www.wananga.it)
 - Bali (con fotografia) e Testi del sito sono già stati importati come bozze. Accedere al pannello con GitHub, rivederli e premere Publish.
 - L'anteprima grafica affiancata (Visual Editing) non è inclusa: questo Studio è un editor a campi.
 
@@ -48,8 +48,8 @@ non contiene database PocketBase, credenziali, node_modules o dati dei contatti.
 
 ## Pubblicare su Netlify
 
-Il sito indicato è https://gleeful-malabi-0cc11f.netlify.app e la lettura
-dei contenuti Sanity da questo dominio è già autorizzata.
+Il sito definitivo è https://wananga.it e la lettura dei contenuti Sanity da
+questo dominio (e da www.wananga.it) è già autorizzata.
 
 Per un aggiornamento manuale: estrarre wananga-netlify-pubblicazione.zip e
 trascinare la cartella contenente index.html nella sezione Deploys del progetto
