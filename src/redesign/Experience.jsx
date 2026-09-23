@@ -334,7 +334,7 @@ function Home() {
         <div className="wa-container coast-hero-content">
           <h1 id="home-title" className="preserve-lines">{settings.homeTitle}</h1>
           <p className="preserve-lines">{settings.homeIntro}</p>
-          <Button to="/viaggi">{settings.homePrimaryCta}</Button>
+          <Button to="/viaggi/bali">{settings.homePrimaryCta}</Button>
         </div>
       </section>
       <section className="wa-container home-vision">
