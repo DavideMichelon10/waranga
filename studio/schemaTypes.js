@@ -1,4 +1,5 @@
 import { defineArrayMember, defineField, defineType } from "sanity";
+import { defaultSettings } from "../src/lib/content.js";
 
 const textField = (name, title, required = false, rows = 4) => defineField({
   name, title, type: "text", rows,
@@ -7,6 +8,53 @@ const textField = (name, title, required = false, rows = 4) => defineField({
 const stringField = (name, title, required = false) => defineField({
   name, title, type: "string",
   validation: (Rule) => required ? Rule.required() : Rule,
+});
+const copySections = [
+  ["nav", "Menu"], ["footer", "Piè di pagina"], ["cms", "Messaggi di caricamento"],
+  ["trips", "Pagina viaggi"], ["trip", "Pagina viaggio"], ["home", "Homepage"],
+  ["about", "Chi siamo"], ["newsletter", "Newsletter"], ["form", "Moduli"],
+  ["application", "Richiesta per Bali"], ["contact", "Contatti"], ["questions", "Domande"],
+  ["legal", "Pagine legali"], ["notFound", "Pagina non trovata"],
+];
+const copyWords = {
+  meta: "SEO", title: "titolo", description: "descrizione", text: "testo", alt: "testo alternativo",
+  cta: "pulsante", button: "pulsante", trips: "viaggi", trip: "viaggio", story: "storia",
+  form: "modulo", name: "nome", questions: "domande", newsletter: "newsletter", rights: "copyright",
+  contact: "contatti", kicker: "sottotitolo", vision: "visione", intro: "introduzione", empty: "nessun risultato",
+  error: "errore", loading: "caricamento", footer: "footer", about: "chi siamo", people: "persone",
+  privacy: "privacy", cookies: "cookie", terms: "termini", sending: "invio", success: "conferma",
+  close: "chiudi", open: "apri", menu: "menu", home: "homepage", image: "immagine", placeholder: "segnaposto",
+  group: "gruppo", duration: "durata", price: "quota", flight: "volo", status: "stato", unavailable: "non disponibile",
+  confirm: "conferma", interest: "interesse", application: "richiesta", review: "rivedi", step: "passaggio",
+  solo: "da solo", select: "selezione", morning: "mattino", afternoon: "pomeriggio", evening: "sera",
+  message: "messaggio", privacy: "privacy", email: "email", phone: "telefono", validation: "validazione",
+  save: "salvataggio", local: "anteprima locale", generic: "generale", image: "immagine",
+  all: "tutte", skip: "salta", to: "a", content: "contenuto", brand: "marchio", label: "etichetta",
+  nav: "menu", retry: "riprova", motto: "frase", byline: "firma", instagram: "Instagram", logo: "logo",
+  founders: "fondatori", hero: "copertina", answer: "risposta",
+  breadcrumb: "percorso", confirm: "da confermare", section: "sezione", before: "prima", cta: "pulsante",
+  full: "completo", closed: "chiuso", open: "aperto", no: "nessun", payment: "pagamento",
+  unavailable: "non disponibile", riccardo: "Riccardo", ftima: "Ftima",
+  quote: "citazione", closing: "chiusura", signup: "iscrizione", new: "nuova", tab: "scheda", return: "ritorno",
+  page: "pagina", cookie: "cookie", not: "non", found: "trovata", faq: "FAQ",
+  sent: "inviata", tail: "conclusione", lead: "inizio", list: "elenco",
+};
+const siteCopy = defineField({
+  name: "siteCopy", title: "Altri testi del sito", type: "object",
+  description: "Qui puoi modificare le etichette e i testi rimasti nelle pagine e nei moduli.",
+  fieldsets: [
+    ...copySections.map(([name, title]) => ({ name, title, options: { collapsible: true, collapsed: true } })),
+    { name: "site", title: "Altri testi", options: { collapsible: true, collapsed: true } },
+  ],
+  fields: Object.keys(defaultSettings.siteCopy).map((name) => {
+    const section = copySections.find(([prefix]) => name.startsWith(prefix));
+    const prefix = section?.[0] || "";
+    const rest = prefix ? name.slice(prefix.length) : name;
+    const words = rest.replace(/([A-Z])/g, " $1").trim().split(/\s+/)
+      .map((word) => copyWords[word.toLowerCase()] || word).join(" ");
+    const title = (section ? section[1] + " — " : "Sito — ") + words;
+    return defineField({ name, title, type: "text", rows: 2, fieldset: prefix || "site" });
+  }),
 });
 
 const trip = defineType({
@@ -73,6 +121,7 @@ const trip = defineType({
 });
 const siteSettings = defineType({
   name: "siteSettings", title: "Testi del sito", type: "document",
+  initialValue: { faq: defaultSettings.faq, siteCopy: defaultSettings.siteCopy },
   fields: [
     textField("homeTitle", "Titolo principale della homepage", false, 2),
     textField("homeIntro", "Presentazione della homepage", false, 3),
@@ -102,6 +151,7 @@ const siteSettings = defineType({
         preview: { select: { title: "question", subtitle: "answer" } },
       })],
     }),
+    siteCopy,
   ],
   preview: { prepare: () => ({ title: "Testi del sito Wānanga" }) },
 });

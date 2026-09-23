@@ -5,16 +5,16 @@ import { httpsUrl } from "../lib/content";
 // No API keys or subscriber records are exposed to the frontend or Sanity.
 const formUrl = httpsUrl(import.meta.env.VITE_REACH_FORM_URL);
 
-export default function ReachNewsletter() {
+export default function ReachNewsletter({ copy }) {
   return (
     <div className="reach-newsletter">
       {formUrl ? <>
-        <p>Iscriviti alla newsletter Wānanga. Puoi cancellare l’iscrizione in qualsiasi momento.</p>
+        <p>{copy.newsletterSignup}</p>
         <a className="wa-button" href={formUrl} target="_blank" rel="noopener noreferrer">
-          Iscriviti alla newsletter <ArrowUpRight size={18} aria-hidden="true" />
+          {copy.newsletterButton} <ArrowUpRight size={18} aria-hidden="true" />
         </a>
-        <p className="form-note">Si apre il nostro modulo di iscrizione in una nuova scheda.</p>
-      </> : <p>Le iscrizioni alla newsletter apriranno presto. Torna a trovarci per le prossime novità.</p>}
+        <p className="form-note">{copy.newsletterNewTab}</p>
+      </> : <p>{copy.newsletterUnavailable}</p>}
     </div>
   );
 }
