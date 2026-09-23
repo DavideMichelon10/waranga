@@ -90,6 +90,18 @@ const siteSettings = defineType({
     stringField("closingCta", "Pulsante finale della pagina Chi siamo"),
     stringField("aboutIntro", "Sottotitolo della pagina Chi siamo"),
     textField("aboutText", "Testo della pagina Chi siamo", false, 12),
+    defineField({
+      name: "faq", title: "Domande frequenti", type: "array",
+      description: "Aggiungi, riordina o rimuovi le domande mostrate nella homepage e nella pagina Domande.",
+      of: [defineArrayMember({
+        name: "faqItem", title: "Domanda", type: "object",
+        fields: [
+          stringField("question", "Domanda", true),
+          textField("answer", "Risposta", true, 5),
+        ],
+        preview: { select: { title: "question", subtitle: "answer" } },
+      })],
+    }),
   ],
   preview: { prepare: () => ({ title: "Testi del sito Wānanga" }) },
 });

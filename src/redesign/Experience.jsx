@@ -248,10 +248,12 @@ function FAQItem({ question, answer }) {
   );
 }
 function FAQ({ all = false }) {
+  const { settings } = useContent();
+  const entries = settings.faq.length ? settings.faq : questions.map(([question, answer]) => ({ question, answer }));
   return (
     <div className="faq-list">
-      {questions.slice(0, all ? questions.length : 4).map(([q, a]) => (
-        <FAQItem key={q} question={q} answer={a} />
+      {entries.slice(0, all ? entries.length : 4).map(({ question, answer }) => (
+        <FAQItem key={question} question={question} answer={answer} />
       ))}
     </div>
   );

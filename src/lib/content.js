@@ -10,7 +10,7 @@ export const CONTENT_QUERY = `{
     homeTitle, homeIntro, homePrimaryCta, tripsTitle, foundersText,
     contactEmail, newsletterTitle, newsletterDescription, visionCta,
     storyCta, tripCardCta, tripInterestCta, tripClosedCta, closingCta,
-    aboutIntro, aboutText
+    aboutIntro, aboutText, faq[]{_key, question, answer}
   }
 }`;
 
@@ -31,6 +31,7 @@ export const defaultSettings = {
   closingCta: "Scopri i viaggi",
   aboutIntro: "Il nostro modo di viaggiare",
   aboutText: "A settembre 2022 abbiamo lasciato l’Italia con un biglietto di sola andata per l’Asia. Abbiamo lasciato il nostro appartamento in affitto e venduto le nostre auto.\n\nQuel primo anno ha dato il via alla nostra vita da nomadi digitali e da allora non abbiamo più smesso davvero di partire. Negli ultimi quattro anni abbiamo attraversato più di 34 Paesi, facendo base tra l’Italia e soprattutto l’Asia.\n\nCi sono luoghi nei quali siamo passati e altri nei quali, invece, abbiamo vissuto a lungo. Bali e la Thailandia, per esempio, sono diventate per noi qualcosa di molto diverso da una destinazione sulla mappa.\n\nSono diventate casa.\n\nWananga nasce da qui.",
+  faq: [],
 };
 
 export const bali = {
@@ -87,6 +88,11 @@ export function normalizeContent(result) {
     if (typeof result.settings?.[key] === "string" && result.settings[key].trim()) {
       settings[key] = result.settings[key];
     }
+  }
+  if (Array.isArray(result.settings?.faq)) {
+    settings.faq = result.settings.faq
+      .filter((item) => typeof item?.question === "string" && item.question.trim() && typeof item?.answer === "string" && item.answer.trim())
+      .map((item) => ({ question: item.question.trim(), answer: item.answer.trim() }));
   }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(settings.contactEmail)) {
     settings.contactEmail = defaultSettings.contactEmail;
