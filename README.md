@@ -22,16 +22,23 @@ Non caricare file `.env`, credenziali o database nel repository.
 - Project ID Sanity: v6jdx1wm. Dataset pubblico: production.
 - Il sito legge SOLO i documenti pubblicati, senza token e senza credenziali.
 - Catalogo /viaggi e pagine /viaggi/:slug generati dai contenuti Sanity.
-- Il pannello Studio locale e remoto include Viaggi, Liste d’attesa e Testi del sito, con campi in italiano. Studio remoto aggiornato il 23 settembre 2026; frontend e Functions restano da pubblicare.
+- Il pannello Studio locale e remoto include Viaggi, Liste d’attesa e Testi del sito, con campi in italiano. Studio remoto aggiornato il 23 settembre 2026; frontend e backend Node.js sono pubblicati su Hostinger; le Functions Netlify non sono in uso.
 - Testi del sito include i testi delle pagine, i pulsanti, le etichette dei moduli e le domande frequenti con le risposte. I valori iniziali corrispondono ai testi già mostrati sul sito.
 - La newsletter mostra un modulo con sola email in homepage e su /newsletter.
-- Il collegamento Reach è in standby: con REACH_ENABLED=false nessun indirizzo viene inviato o salvato.
+- Newsletter Reach attiva sul dominio di prova Hostinger; iscrizione online verificata il 24 settembre 2026. Configurazione e limiti in [HOSTINGER-NEWSLETTER.md](HOSTINGER-NEWSLETTER.md). `REACH_ENABLED=false` permette di disattivare la raccolta.
 - Studio pubblicato: https://wananga-v6jdx1wm.sanity.studio/
 - Dominio frontend autorizzato in Sanity: https://wananga.it (anche https://www.wananga.it)
 - Bali (con fotografia) e Testi del sito sono già stati importati come bozze. Accedere al pannello con GitHub, rivederli e premere Publish.
 - L'anteprima grafica affiancata (Visual Editing) non è inclusa: questo Studio è un editor a campi.
 
-## Caricare lo ZIP come Web App su Hostinger
+## Pubblicazione Hostinger attuale
+
+Il sito https://darkblue-alligator-613930.hostingersite.com/ è collegato al branch `main`
+di GitHub e usa il server Node.js per newsletter e waiting list. Seguire
+[HOSTINGER-NEWSLETTER.md](HOSTINGER-NEWSLETTER.md): build `build`, tipo Express,
+output vuoto ed entry file `app.js`. Le credenziali sono variabili server riservate.
+
+## Caricare soltanto il frontend statico su Hostinger
 
 Lo ZIP contiene package.json, src e index.html direttamente alla radice.
 La cartella studio è indipendente e non va scelta come directory principale del sito.
@@ -61,7 +68,7 @@ pubblicazione completa usare un deploy che includa le Functions e Netlify Blobs
 contiene il sito statico e **non installa il backend della waiting list**.
 
 Build: `npm run build`; output: `dist`; funzioni: `netlify/functions`.
-Non è stato effettuato alcun push. Il solo Studio Sanity è stato pubblicato su richiesta; il frontend e le Functions restano locali.
+Il frontend e il backend Node.js sono pubblicati su Hostinger tramite GitHub. Le Functions Netlify restano disponibili come alternativa e non sono state pubblicate.
 Le funzioni server richiedono la configurazione descritta in [WAITING-LISTS.md](WAITING-LISTS.md).
 Hostinger statico può ospitare il frontend, ma non esegue queste Netlify Functions:
 per quel tipo di hosting occorre adattare il backend.
@@ -120,7 +127,7 @@ aggiungi le tappe > Publish. Lo slug diventa /viaggi/nome-del-viaggio.
 
 ## Waiting list e newsletter con Hostinger Reach
 
-Implementati i moduli di iscrizione e le rotte server `/api/waitlist` e `/api/newsletter`. La connessione resta disabilitata finché mancano le
+Implementati i moduli di iscrizione e le rotte server `/api/waitlist` e `/api/newsletter`. La connessione è attiva sul dominio Hostinger configurato. Negli altri ambienti resta disabilitata finché mancano le
 credenziali e `REACH_ENABLED=true`: il modulo mostra l’indisponibilità solo dopo
 il tentativo di invio e non simula un’iscrizione riuscita.
 
@@ -131,7 +138,7 @@ facoltativo e inizialmente non selezionato.
 
 Il backend aggiunge un tag Reach per ogni partenza e `wananga-newsletter` solo
 su richiesta. I contatti restano in Reach; la prova dei consensi è conservata
-in Netlify Blobs privato, mai nel dataset pubblico Sanity.
+su Hostinger in una directory privata persistente (su Netlify, in Blobs privato), mai nel dataset pubblico Sanity.
 
 Il sito salva i contatti e le preferenze in Reach. Non crea campagne, bozze email,
 né invia email. La pubblicazione o modifica di un viaggio non contatta gli iscritti.

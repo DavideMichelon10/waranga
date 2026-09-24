@@ -74,15 +74,27 @@ il flusso Git automatico, pubblicare questi sorgenti e configurare nel pannello
 lo script `build`, output vuoto ed entry file `app.js`: una build del vecchio branch
 Vite può rimuovere il backend.
 
-## Esito della prova del 24 settembre 2026
+## Verifica online del 24 settembre 2026
 
-- Token e UUID del profilo verificati tramite API.
-- Iscrizione reale dal backend locale: HTTP 200, stato `subscribed`.
-- Test automatici: 13 superati; build frontend e pacchetto server riuscite.
-- Le build server Hostinger risultano `completed`, ma il dominio restituisce
-  HTTP 403 e gli endpoint API HTTP 404. Il file `.htaccess` atteso non risulta
-  presente tramite l'API file e i log runtime non riportano avvii.
-- Ultima build server esaminata: `01a0d069-4278-704e-86df-b485bafb648b`.
-- È stato richiesto il ripristino della configurazione Vite e del sorgente Git
-  originali. Non considerare la newsletter online attiva finché una richiesta
-  effettuata al dominio Hostinger non riceve conferma e viene verificata in Reach.
+- Sito: https://darkblue-alligator-613930.hostingersite.com/.
+- Deploy collegato a `DavideMichelon10/waranga`, branch `main`.
+- Configurazione funzionante: Express, Node 22, build `build`, output vuoto,
+  entry file `app.js`. Homepage HTTP 200; GET `/api/newsletter` HTTP 405,
+  perché l’endpoint accetta solo POST.
+- Iscrizione dal dominio pubblico con un indirizzo autorizzato dal proprietario:
+  HTTP 200, stato `subscribed`. Contatto verificato anche tramite API Reach.
+- I 13 test automatici e la build frontend sono passati.
+- Il primo tentativo online restituiva `reach_401`: le variabili runtime sono
+  state aggiornate con il token verificato. Non inserire mai `********` come
+  credenziale: l’API di lettura Hostinger restituisce soltanto valori mascherati.
+- L’API di aggiornamento delle variabili sostituisce l’intero insieme. Una copia
+  privata `.env.hostinger`, esclusa da Git e con permessi 0600, permette di
+  conservarne i valori in futuri aggiornamenti; non includerla negli archivi.
+- In questa configurazione è stato generato un nuovo segreto dei consensi.
+  I tentativi precedenti dal sito erano falliti; i loro record privati restano
+  sul server. Conservare stabile il nuovo segreto nelle pubblicazioni successive.
+- I log riportano solo codici di errore noti, senza indirizzi email o token.
+
+Le campagne e le eventuali automazioni email si gestiscono nel pannello Reach.
+La prova online riguarda la newsletter; le liste d’attesa condividono il backend
+ma richiedono anche un documento Sanity pubblicato con stato di raccolta aperto.
