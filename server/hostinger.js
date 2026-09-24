@@ -2,6 +2,7 @@ import { createServer } from 'node:http';
 import { readFile, realpath } from 'node:fs/promises';
 import { resolve, extname, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createFormHandler } from './forms.js';
 import { createSubscribeHandler } from './subscribe.js';
 import { createHostingerStore } from './hostinger-store.js';
 
@@ -21,25 +22,27 @@ export function createHostingerServer({ origin = process.env.PUBLIC_ORIGIN, dire
     store: () => (store ||= createHostingerStore(directory)),
     limit: (storage, key, limit) => storage.limit(key, limit),
   });
+  const forms = createFormHandler({ store: () => (store ||= createHostingerStore(directory)) });
   return createServer(async (req, res) => {
     const sendJson = (status, error) => { res.writeHead(status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify({ error })); };
     try {
       // Use the configured public origin, never untrusted Host/forwarded headers.
       const url = new URL(req.url, origin);
       if (url.origin !== origin) return sendJson(400, 'invalid_request');
-      if (['/api/newsletter', '/api/waitlist'].includes(url.pathname)) {
+      if (['/api/newsletter', '/api/waitlist', '/api/contact', '/api/application'].includes(url.pathname)) {
+        const isForm = ['/api/contact', '/api/application'].includes(url.pathname);
         if (req.method !== 'POST') { res.setHeader('Allow', 'POST'); return sendJson(405, 'method_not_allowed'); }
         const chunks = []; let size = 0;
         for await (const chunk of req) {
           size += chunk.length;
-          if (size > 4096) return sendJson(413, 'invalid_request');
+          if (size > (isForm ? 24000 : 4096)) return sendJson(413, 'invalid_request');
           chunks.push(chunk);
         }
         const headers = new Headers();
         for (const [key, value] of Object.entries(req.headers)) if (value) headers.set(key, String(value));
         const request = new Request(url, { method: 'POST', headers, body: Buffer.concat(chunks) });
         // Behind a proxy the per-address cap is shared. Do not trust user-supplied X-Forwarded-For.
-        const response = await subscribe(request, { ip: req.socket.remoteAddress });
+        const response = await (isForm ? forms : subscribe)(request, { ip: req.socket.remoteAddress });
         res.writeHead(response.status, Object.fromEntries(response.headers));
         return res.end(await response.text());
       }

@@ -149,35 +149,34 @@ Le vecchie variabili `VITE_NEWSLETTER_ENDPOINT` e `VITE_REACH_FORM_URL` non sono
 
 ## Moduli di contatto e candidature
 
-Sono ancora collegati al backend PocketBase originale tramite /hcgi/platform.
-Si può indicare un backend esistente differente con VITE_POCKETBASE_URL, verificandone
-autorizzazioni e CORS. Questo ZIP non avvia PocketBase e non migra le richieste.
+I moduli pubblici inviano a `/api/contact` e `/api/application` sul server
+Hostinger. Non dipendono più da PocketBase. Le richieste compaiono in Reach:
 
-Il backend originale limita il campo candidature.viaggio a un elenco fisso.
-Per questo:
-- Bali mantiene /candidatura-bali e la collezione candidature;
-- gli altri viaggi aprono /contattaci con il nome del viaggio nel messaggio e salvano
-  nella collezione contatti, senza inventare valori non supportati dal backend.
+- `wananga-contatti`: richieste da Contattaci;
+- `wananga-candidature`: candidature, con un tag `wananga-viaggio-<slug>`;
+- `wananga-newsletter`: solo per il consenso newsletter, separato e facoltativo.
 
-La candidatura raccoglie nome, email, telefono, età, numero di persone,
-fascia oraria di contatto, motivazione e precedente esperienza di gruppo (Sì/No).
-Questi campi sono obbligatori; le note sulle esigenze personali sono facoltative.
-Il backend originale non ha un campo età: il valore viene conservato in
-`info_utili` come “Età: … anni”, seguito dalle eventuali note (massimo 1900
-caratteri, per rispettare il limite complessivo di 2000 del campo).
-La risposta Sì/No viene salvata in `esperienza_gruppo`.
+Aprire il contatto per leggere i campi **Wānanga · …**. Nome, email e telefono
+internazionale usano anche i campi standard. Messaggi, motivazioni e note lunghe
+sono divisi in campi numerati di 255 caratteri senza troncare il testo.
+Reach ha una scheda per email: i nuovi invii aggiornano i campi dello stesso
+modulo; il messaggio di contatto e le risposte della candidatura restano distinti.
+Le copie integrali dei tentativi e dei consensi restano nel percorso privato
+Hostinger per recupero tecnico. Non c’è un nuovo pannello da usare.
 
-Entrambi i moduli richiedono la casella dell'informativa privacy e offrono una
-casella newsletter facoltativa, inizialmente non selezionata. La scelta viene
-inclusa nel payload PocketBase come consenso_newsletter (true/false).
-Il frontend non chiama Reach da questi moduli: il collegamento resta in standby.
-Quando verrà configurato il backend, verificare che la sincronizzazione Reach
-avvenga solo per chi ha espresso il consenso. Il vecchio backend Horizons può
-avere hook di sincronizzazione propri, da controllare prima di ricollegarlo.
+Il server convalida i campi, controlla che il viaggio pubblicato accetti richieste,
+limita gli invii e protegge dai duplicati. In caso di errore conserva i dati nel
+modulo e non dichiara la richiesta ricevuta finché Reach non l’ha salvata.
+Una newsletter non completata viene segnalata separatamente dopo il salvataggio
+della richiesta, senza riattivare contatti già disiscritti.
 
-Finché il backend non è disponibile sul dominio pubblicato, questi due moduli
-non possono inviare: mostrano l'errore e conservano il testo, senza simulare successo.
-Le pagine privacy e termini già presenti nell'export sono ancora da completare.
+`/candidatura-bali` resta valido; gli altri viaggi pubblicati usano
+`/candidatura/:slug`. Il campo età è indipendente dalle note. Non servono modifiche
+allo schema PocketBase né valori di destinazione predefiniti.
+
+Configurazione e limiti Reach: [HOSTINGER-NEWSLETTER.md](HOSTINGER-NEWSLETTER.md).
+Le pagine privacy, cookie e termini restano da completare con testi del titolare;
+questa integrazione non inventa condizioni di viaggio o documenti approvati.
 
 ## Dove intervenire nel codice
 

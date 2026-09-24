@@ -1,4 +1,4 @@
-import { mkdir, writeFile, rename, unlink, readdir } from 'node:fs/promises';
+import { mkdir, writeFile, rename, unlink, readdir, readFile, rm } from 'node:fs/promises';
 import { createHash, randomUUID } from 'node:crypto';
 import { isAbsolute, join } from 'node:path';
 import { ServiceError } from './reach.js';
@@ -11,6 +11,18 @@ export function createHostingerStore(directory) {
   let lastCleanup = -1;
   const digest = value => createHash('sha256').update(value).digest('hex');
   return {
+    async getJSON(key) {
+      try { return JSON.parse(await readFile(join(consentDirectory, digest(key) + '.json'), 'utf8')); }
+      catch (error) { if (error.code === 'ENOENT') return null; throw error; }
+    },
+    async withLock(key, operation) {
+      const locks = join(directory, 'locks');
+      await mkdir(locks, { recursive: true, mode: 0o700 });
+      const lock = join(locks, digest(key));
+      try { await mkdir(lock, { mode: 0o700 }); }
+      catch (error) { if (error.code === 'EEXIST') throw new ServiceError('request_in_progress', 409); throw error; }
+      try { return await operation(); } finally { await rm(lock, { recursive: true, force: true }); }
+    },
     async setJSON(key, value) {
       await mkdir(consentDirectory, { recursive: true, mode: 0o700 });
       const target = join(consentDirectory, digest(key) + '.json');

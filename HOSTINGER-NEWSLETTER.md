@@ -98,3 +98,33 @@ Vite può rimuovere il backend.
 Le campagne e le eventuali automazioni email si gestiscono nel pannello Reach.
 La prova online riguarda la newsletter; le liste d’attesa condividono il backend
 ma richiedono anche un documento Sanity pubblicato con stato di raccolta aperto.
+
+## Contattaci e candidature direttamente in Reach
+
+Gli endpoint `/api/contact` e `/api/application` salvano i campi in Reach e
+assegnano i tag `wananga-contatti`, `wananga-candidature` e quello del viaggio.
+Gli UUID dei campi in `server/reach-fields.json` appartengono al profilo Wānanga;
+sono identificativi pubblicabili, non credenziali. Per un altro profilo occorre
+creare i campi e aggiornare questa mappa. I campi testo Reach hanno un limite
+verificato di 255 caratteri; quelli lunghi sono suddivisi in parti numerate.
+
+Un contatto nuovo senza consenso newsletter viene creato e subito marcato
+`unsubscribed`; un contatto esistente conserva il suo stato e le iscrizioni
+precedenti. Non attivare automazioni generiche «nuovo contatto» per queste
+richieste: la creazione API Reach parte da uno stato mailable. Il backend verifica
+le automazioni e rifiuta di creare un contatto operativo nuovo se ne trova una
+attiva. Le campagne newsletter vanno indirizzate al tag `wananga-newsletter`.
+Non è stata attivata alcuna automazione né alcun invio email.
+
+Reach conserva un contatto per email e mostra gli ultimi valori di ogni modulo.
+Ogni invio conserva anche una copia integrale privata sul server con ID casuale,
+esito e consenso. Le richieste fallite si possono riprovare; quelle completate
+con lo stesso ID non vengono reinviate. I lock in `PRIVATE_DATA_DIR/locks` evitano
+aggiornamenti contemporanei dello stesso contatto. Dopo un arresto anomalo,
+un eventuale lock orfano va rimosso dall’amministratore solo dopo aver verificato
+che nessun processo stia elaborando quel contatto.
+
+Per la prova locale completa avviare `app.js` con variabili server, origine locale
+e una directory privata di test esterna al progetto. Il server Vite di sviluppo
+lascia i nuovi moduli in standby. I vecchi componenti dell’export non montati
+dall’applicazione pubblica restano separati; il sito usa `src/redesign/Experience.jsx`.

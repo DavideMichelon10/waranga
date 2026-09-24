@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import formFields from './reach-fields.json' with { type: 'json' };
 
 export class ServiceError extends Error {
   constructor(code, status = 503) { super(code); this.code = code; this.status = status; }
@@ -58,5 +59,62 @@ export function createReach({ token, profileId, fetcher = fetch }) {
     // Tags are additive: opting out here never removes an earlier newsletter opt-in.
     return { status: contact.subscription_status === 'pending' ? 'pending_confirmation' : 'subscribed', contactUuid: contact.uuid };
   }
-  return { subscribe };
+  async function submitForm(data) {
+    let contact = await findContact(data.email);
+    // Creating an API contact makes it mailable by default. Never create an
+    // operational-only contact while an automation could send a welcome email.
+    if (!contact && !data.consenso_newsletter) {
+      const automations = unwrap(await request('/automations?per_page=100'));
+      if (!Array.isArray(automations) || automations.some(a => a.status === 'active') || automations.length >= 100) throw new ServiceError('operational_contact_automation');
+    }
+    const names = [data.kind === 'contact' ? 'wananga-contatti' : 'wananga-candidature'];
+    if (data.kind === 'application') names.push('wananga-viaggio-' + data.tripSlug);
+    if (!contact) {
+      try {
+        await request('/contacts', 'POST', { email: data.email, name: data.nome, note: data.consenso_newsletter ? 'Richiesta dal sito Wānanga' : 'wananga-contact-only' });
+      } catch (error) {
+        if (!['reach_409', 'reach_422'].includes(error.code)) throw error;
+        contact = await findContact(data.email);
+        if (!contact) throw error;
+      }
+      contact ||= await findContact(data.email);
+      if (!contact) throw new ServiceError('contact_not_ready');
+    }
+    const values = { request_kind: data.kind === 'contact' ? 'Contattaci' : 'Candidatura', request_at: data.at, newsletter_consent: data.consenso_newsletter ? 'Sì' : 'No' };
+    if (data.kind === 'contact') values.message = data.messaggio;
+    else Object.assign(values, { trip: data.viaggio, age: String(data.eta), people: data.numero_persone, contact_time: data.contatto_preferito, motivation: data.motivazione, experience: data.esperienza_gruppo, notes: data.info_utili, phone: data.telefono });
+    const fields = Object.entries(values).flatMap(([key, value]) => {
+      const ids = Array.isArray(formFields[key]) ? formFields[key] : [formFields[key]];
+      const chars = Array.from(value);
+      if (!ids[0] || chars.length > ids.length * 255) throw new ServiceError('form_field_capacity');
+      return ids.map((uuid, i) => ({ uuid, value: chars.slice(i * 255, (i + 1) * 255).join('') || null }));
+    });
+    const details = unwrap(await request('/contacts/' + encodeURIComponent(contact.uuid)));
+    if (!Array.isArray(details?.fields)) throw new ServiceError('invalid_reach_fields');
+    const changed = new Set(fields.map(field => field.uuid));
+    const preserved = details.fields.filter(field => !changed.has(field.uuid)).map(field => ({ uuid: field.uuid, ...(['single_choice', 'multi_choice'].includes(field.type) ? { selected_option_uuids: field.selected_option_uuids || [] } : { value: field.value }) }));
+    const body = { name: data.nome, fields: [...preserved, ...fields] };
+    // Never unsubscribe an existing newsletter member who leaves the box empty.
+    // The marker also repairs an interrupted first submission on retry.
+    if (!data.consenso_newsletter && contact.note === 'wananga-contact-only') {
+      body.subscription_status = 'unsubscribed';
+      body.note = 'Richiesta dal sito Wānanga (senza newsletter)';
+    }
+    if (data.telefono) {
+      const phone = data.telefono.replace(/[\s().-]/g, '').replace(/^00/, '+');
+      if (/^\+[1-9]\d{6,14}$/.test(phone)) body.phone = phone;
+    }
+    await request('/contacts/' + encodeURIComponent(contact.uuid), 'PATCH', body);
+    for (const tag of await ensureTags(names)) await request(`/tags/${encodeURIComponent(tag.uuid)}/contacts/${encodeURIComponent(contact.uuid)}`, 'POST');
+    let newsletter = 'not_requested';
+    if (data.consenso_newsletter) {
+      if (!['subscribed','pending','confirmed'].includes(contact.subscription_status)) newsletter = 'not_subscribed';
+      else {
+        try { newsletter = (await subscribe(data.email, [NEWSLETTER_TAG])).status; }
+        catch { newsletter = 'failed'; }
+      }
+    }
+    return { contactUuid: contact.uuid, newsletter };
+  }
+  return { subscribe, submitForm };
 }

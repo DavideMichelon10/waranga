@@ -97,7 +97,7 @@ dei record esistenti.
 
 ## Altri limiti già presenti
 
-I moduli candidatura e contatto continuano a usare PocketBase: questa modifica
-non li migra a Reach. Il loro consenso newsletter rimane nel relativo payload.
+I moduli candidatura e contatto sono ora collegati direttamente a Reach dal backend
+Hostinger. La loro iscrizione newsletter resta facoltativa e separata.
 I metadati delle pagine sono aggiornati nel browser; alcuni social potranno usare
 l’anteprima generica del sito finché non viene introdotto il rendering lato server.

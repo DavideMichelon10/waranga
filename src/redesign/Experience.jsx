@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import {
   BrowserRouter,
   Link,
@@ -21,7 +21,7 @@ import {
   Instagram,
   Loader2,
 } from "lucide-react";
-import pb from "../lib/pocketbaseClient";
+import { submitForm } from "../lib/forms";
 import { ContentProvider, useContent } from "../contexts/ContentContext";
 import { acceptsRequests, tripRequestPath } from "../lib/content";
 import ReachNewsletter from "../components/ReachNewsletter";
@@ -491,11 +491,13 @@ function Philosophy() {
   );
 }
 
-function SubmissionForm({ kind = "application", defaultMessage = "" }) {
+function SubmissionForm({ kind = "application", defaultMessage = "", tripSlug = "bali" }) {
   const { settings } = useContent();
   const copy = settings.siteCopy;
   const application = kind === "application";
   const notesHintId = useId();
+  const requestId = useRef(crypto.randomUUID());
+  const [newsletterResult, setNewsletterResult] = useState("");
   const [status, setStatus] = useState("idle"),
     [error, setError] = useState("");
   const submit = async (e) => {
@@ -510,6 +512,7 @@ function SubmissionForm({ kind = "application", defaultMessage = "" }) {
     setStatus("sending");
     setError("");
     const payload = {
+      requestId: requestId.current, website: values.website || "",
       nome: values.nome.trim(),
       email: values.email.trim(),
       privacy_accepted: values.privacy === "on",
@@ -517,35 +520,23 @@ function SubmissionForm({ kind = "application", defaultMessage = "" }) {
     };
     if (application)
       Object.assign(payload, {
-        viaggio: "Bali",
+        tripSlug, eta: values.eta,
         telefono: values.telefono.trim(),
         numero_persone: values.numero_persone,
         contatto_preferito: values.contatto_preferito,
         motivazione: values.motivazione.trim(),
         aspettative: "",
         esperienza_gruppo: values.esperienza_gruppo,
-        // The existing backend has no age field. Keep it with the applicant's
-        // information so it is saved without requiring a remote schema change.
-        info_utili: [
-          `Età: ${values.eta} anni`,
-          values.info_utili.trim(),
-        ].filter(Boolean).join("\n\n"),
+        info_utili: values.info_utili.trim(),
       });
     else payload.messaggio = values.messaggio.trim();
     try {
-      await pb
-        .collection(
-          application ? "candidature" : "contatti",
-        )
-        .create(payload);
+      const result = await submitForm(kind, payload);
+      setNewsletterResult(result.newsletter);
       setStatus("success");
       form.reset();
     } catch (err) {
-      setError(
-        Object.keys(err?.response?.data || {}).length
-          ? copy.formValidationError
-          : copy.formSaveError,
-      );
+      setError(err.message || copy.formSaveError);
       setStatus("error");
     }
   };
@@ -556,10 +547,13 @@ function SubmissionForm({ kind = "application", defaultMessage = "" }) {
         <h3>{copy.formSuccessTitle}</h3>
         <p>{copy.formSuccessText}</p>
         {application && <p>{copy.formSuccessApplication}</p>}
+        {newsletterResult === 'pending_confirmation' && <p>Per la newsletter, controlla la tua email e conferma l’iscrizione.</p>}
+        {['failed', 'not_subscribed'].includes(newsletterResult) && <p>La richiesta è stata ricevuta. L’iscrizione alla newsletter non è stata completata; puoi riprovare dalla <Link to="/newsletter">pagina newsletter</Link>.</p>}
       </div>
     );
   return (
-    <form className="wa-form" onSubmit={submit} onInput={(event) => event.target.setCustomValidity?.("")}>
+    <form className="wa-form" aria-busy={status === "sending"} onSubmit={submit} onInput={(event) => event.target.setCustomValidity?.("")}>
+      <label className="form-trap" aria-hidden="true">Sito web<input name="website" tabIndex={-1} autoComplete="off" /></label>
       <fieldset className="form-section">
         {application && <legend><span className="form-section-number" aria-hidden="true">01</span>{copy.formPersonalSection}</legend>}
         <div className="form-section-fields">
@@ -579,6 +573,7 @@ function SubmissionForm({ kind = "application", defaultMessage = "" }) {
               <input
                 name="email"
                 type="email"
+                maxLength={254}
                 autoComplete="email"
                 required
                 placeholder={copy.formEmailPlaceholder}
@@ -734,7 +729,7 @@ function SubmissionForm({ kind = "application", defaultMessage = "" }) {
       </button>
       {application && (
         <p className="form-note">
-          {copy.formApplicationNote}
+          {tripSlug === "bali" ? copy.formApplicationNote : "Invii una richiesta di interesse. Non prenoti un posto e non è richiesto un pagamento."}
         </p>
       )}
       {import.meta.env.MODE === "local" && (
@@ -748,10 +743,11 @@ function SubmissionForm({ kind = "application", defaultMessage = "" }) {
 function Application() {
   const { trips, settings, status } = useContent();
   const copy = settings.siteCopy;
-  const trip = trips.find((item) => item.slug === "bali");
+  const { slug = "bali" } = useParams();
+  const trip = trips.find((item) => item.slug === slug);
   if (status !== "ready") return <section className="wa-section wa-container"><ContentState /></section>;
   if (!trip) return <NotFound />;
-  if (!acceptsRequests(trip)) return <Navigate to="/viaggi/bali" replace />;
+  if (!acceptsRequests(trip)) return <Navigate to={`/viaggi/${slug}`} replace />;
   return (
     <>
       <Meta title={copy.applicationMetaTitle} description={copy.applicationMetaDescription} />
@@ -759,14 +755,14 @@ function Application() {
         <div>
           <p className="section-kicker">{copy.applicationKicker}</p>
           <h1 className="preserve-lines">{copy.applicationTitle}</h1>
-          <p className="lead-text">{copy.applicationIntro}</p>
+          <p className="lead-text">{slug === "bali" ? copy.applicationIntro : `Ti incuriosisce ${trip.title}? Raccontaci qualcosa di te.`}</p>
           <p>{copy.applicationDescription}</p>
           <div className="application-trip">
             {trip.image && <img src={trip.image} alt={trip.imageAlt || trip.title} />}
             <div>
               <strong>{trip.title}, {trip.destination}</strong>
               <small>{trip.dateLabel}</small>
-              <Button secondary compact to="/viaggi/bali">{copy.applicationReview}</Button>
+              <Button secondary compact to={`/viaggi/${slug}`}>{copy.applicationReview}</Button>
             </div>
           </div>
           <ol className="next-steps">
@@ -778,7 +774,7 @@ function Application() {
         <div className="form-panel">
           <h2>{copy.applicationFormTitle}</h2>
           <p>{copy.applicationFormNote}</p>
-          <SubmissionForm />
+          <SubmissionForm key={slug} tripSlug={slug} />
         </div>
       </section>
     </>
@@ -871,6 +867,7 @@ export default function Experience() {
           <Route path="/chi-siamo" element={<Philosophy />} />
           <Route path="/domande" element={<Questions />} />
           <Route path="/candidatura-bali" element={<Application />} />
+          <Route path="/candidatura/:slug" element={<Application />} />
           <Route path="/contattaci" element={<Contact />} />
           {["/il-nostro-modo-di-viaggiare", "/filosofia"].map((path) => (
             <Route

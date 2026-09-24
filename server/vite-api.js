@@ -7,7 +7,12 @@ export function localApi() {
     configureServer(server) {
       server.middlewares.use(async (req, res, next) => {
         const path = req.url?.split('?')[0];
-        if (!['/api/waitlist', '/api/newsletter'].includes(path)) return next();
+        if (!['/api/waitlist', '/api/newsletter', '/api/contact', '/api/application'].includes(path)) return next();
+        // Development never silently writes real contacts with production credentials.
+        if (['/api/contact', '/api/application'].includes(path)) {
+          res.statusCode = 503; res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ error: 'not_configured' })); return;
+        }
         try {
           const headers = new Headers();
           for (const [key, value] of Object.entries(req.headers)) if (value) headers.set(key, String(value));

@@ -220,9 +220,7 @@ export async function fetchContent({ projectId, dataset, signal, fetcher = fetch
 }
 
 export function tripRequestPath(trip) {
-  // Horizons' candidature collection accepts only a fixed set of travel names.
-  // New CMS trips use the contact form, preserving the requested destination.
-  return trip.slug === "bali" ? "/candidatura-bali" : "/contattaci?viaggio=" + encodeURIComponent(trip.title);
+  return trip.slug === "bali" ? "/candidatura-bali" : "/candidatura/" + encodeURIComponent(trip.slug);
 }
 
 export function acceptsRequests(trip) {
