@@ -83,7 +83,7 @@ Vite può rimuovere il backend.
   perché l’endpoint accetta solo POST.
 - Iscrizione dal dominio pubblico con un indirizzo autorizzato dal proprietario:
   HTTP 200, stato `subscribed`. Contatto verificato anche tramite API Reach.
-- I 20 test automatici e la build frontend sono passati.
+- I 22 test automatici e la build frontend sono passati.
 - Il primo tentativo online restituiva `reach_401`: le variabili runtime sono
   state aggiornate con il token verificato. Non inserire mai `********` come
   credenziale: l’API di lettura Hostinger restituisce soltanto valori mascherati.
@@ -106,7 +106,8 @@ assegnano i tag `wananga-contatti`, `wananga-candidature` e quello del viaggio.
 Gli UUID dei campi in `server/reach-fields.json` appartengono al profilo Wānanga;
 sono identificativi pubblicabili, non credenziali. Per un altro profilo occorre
 creare i campi e aggiornare questa mappa. I campi testo Reach hanno un limite
-verificato di 255 caratteri; quelli lunghi sono suddivisi in parti numerate.
+verificato di 255 caratteri: si mostra un’anteprima, con il testo completo nella
+scheda riservata collegata dal campo `Wānanga · Apri richieste complete`.
 
 Un contatto nuovo senza consenso newsletter viene creato e subito marcato
 `unsubscribed`; un contatto esistente conserva il suo stato e le iscrizioni
@@ -139,3 +140,32 @@ Reach può accettare una creazione prima di rendere il nuovo contatto ricercabil
 Il backend effettua tentativi di lettura con attese brevi prima di aggiornare
 campi e tag. Se il contatto non diventa disponibile, segnala errore e conserva
 la richiesta per il nuovo tentativo, senza dichiarare una consegna inesistente.
+
+## Uso quotidiano e storico
+
+1. Aprire Reach → Contatti, filtrando per `wananga-contatti` o `wananga-candidature`.
+2. Aprire la persona e leggere riepilogo, viaggio e consenso newsletter.
+3. Aprire (o copiare nel browser) il collegamento **Wānanga · Apri richieste complete**
+   per leggere tutti gli invii, più recenti per primi. Espandere le richieste precedenti.
+4. Il pulsante **Rispondi via email** apre il programma di posta; non invia nulla
+   automaticamente. Le campagne restano in Reach.
+
+Lo storico usa copie atomiche dei record privati già conservati sul server e
+recupera anche le richieste precedenti di quella persona al primo aggiornamento.
+Lo stesso ID di invio aggiorna il tentativo esistente; un invio nuovo crea una
+voce distinta. I testi integrali non dipendono dai limiti dei campi Reach.
+
+La scheda `/richieste/<chiave>` è di sola lettura: una chiave HMAC non indovinabile,
+separata per email, autorizza l’accesso al solo storico della persona. Non esiste
+un elenco pubblico. La chiave non viene restituita al visitatore che compila il
+modulo; viene salvata solo nella scheda Reach. Chi riceve questo URL può leggere
+lo storico: mantenerlo riservato. La pagina impedisce indicizzazione, embedding,
+cache e invio del referrer; non carica script o risorse esterne. I dati sono
+mostrati come testo, senza eseguire HTML inviato nei moduli.
+
+`CONSENT_HASH_SECRET` mantiene validi questi collegamenti: conservarlo stabile e
+privato. Cambiare dominio richiede aggiornare `PUBLIC_ORIGIN` e i collegamenti
+salvati in Reach. Il percorso `PRIVATE_DATA_DIR` va mantenuto nei backup Hostinger;
+la sopravvivenza ai deploy è verificata, un backup esterno non è configurato da
+questa integrazione. La cancellazione di un contatto Reach non elimina da sola
+le copie private: gestire entrambe secondo la conservazione definita dal titolare.

@@ -90,11 +90,16 @@ export function createReach({ token, profileId, fetcher = fetch, pause = ms => n
       if (!contact) throw new ServiceError('contact_not_ready');
     }
     const values = { request_kind: data.kind === 'contact' ? 'Contattaci' : 'Candidatura', request_at: data.at, newsletter_consent: data.consenso_newsletter ? 'Sì' : 'No' };
+    if (data.historyUrl) values.history_url = data.historyUrl;
     if (data.kind === 'contact') values.message = data.messaggio;
     else Object.assign(values, { trip: data.viaggio, age: String(data.eta), people: data.numero_persone, contact_time: data.contatto_preferito, motivation: data.motivazione, experience: data.esperienza_gruppo, notes: data.info_utili, phone: data.telefono });
     const fields = Object.entries(values).flatMap(([key, value]) => {
       const ids = Array.isArray(formFields[key]) ? formFields[key] : [formFields[key]];
       const chars = Array.from(value);
+      if (['message', 'motivation', 'notes'].includes(key) && chars.length > 255) {
+        if (!data.historyUrl) throw new ServiceError('missing_form_history');
+        chars.splice(210); chars.push(...Array.from('… (testo completo nella scheda richieste)'));
+      }
       if (!ids[0] || chars.length > ids.length * 255) throw new ServiceError('form_field_capacity');
       return ids.map((uuid, i) => ({ uuid, value: chars.slice(i * 255, (i + 1) * 255).join('') || null }));
     });

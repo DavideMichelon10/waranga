@@ -2,6 +2,7 @@ import { createServer } from 'node:http';
 import { readFile, realpath } from 'node:fs/promises';
 import { resolve, extname, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { handleHistory } from './form-history.js';
 import { createFormHandler } from './forms.js';
 import { createSubscribeHandler } from './subscribe.js';
 import { createHostingerStore } from './hostinger-store.js';
@@ -29,6 +30,11 @@ export function createHostingerServer({ origin = process.env.PUBLIC_ORIGIN, dire
       // Use the configured public origin, never untrusted Host/forwarded headers.
       const url = new URL(req.url, origin);
       if (url.origin !== origin) return sendJson(400, 'invalid_request');
+      if (url.pathname === '/richieste' || url.pathname.startsWith('/richieste/')) {
+        const response = await handleHistory(new Request(url, { method: req.method }), { store: () => (store ||= createHostingerStore(directory)) });
+        res.writeHead(response.status, Object.fromEntries(response.headers));
+        return res.end(await response.text());
+      }
       if (['/api/newsletter', '/api/waitlist', '/api/contact', '/api/application'].includes(url.pathname)) {
         const isForm = ['/api/contact', '/api/application'].includes(url.pathname);
         if (req.method !== 'POST') { res.setHeader('Allow', 'POST'); return sendJson(405, 'method_not_allowed'); }

@@ -20,7 +20,7 @@ async function fixture(t) {
 }
 test('invalid forms, cross-origin submissions and closed trips never reach provider', async t => {
   const { db } = await fixture(t); let calls = 0;
-  const handler = createFormHandler({ store: () => db, enabled: () => true, hash: s => s, getTrip: async () => ({ title: 'Bali', status: 'closed' }), reach: () => ({ submitForm: async () => { calls++; } }) });
+  const handler = createFormHandler({ historySecret: 'unit-test-history-secret', store: () => db, enabled: () => true, hash: s => s, getTrip: async () => ({ title: 'Bali', status: 'closed' }), reach: () => ({ submitForm: async () => { calls++; } }) });
   for (const bad of [{...input(), privacy_accepted:false},{...input(),consenso_newsletter:'false'},{...input(),email:'bad'},{...input(),messaggio:'x'.repeat(5001)},{...input(),website:'spam'},{...input(),requestId:'../secret'}]) assert.equal((await handler(request(bad))).status,400);
   assert.equal((await handler(request(input(),'/api/contact','https://other.example'))).status,403);
   assert.equal((await handler(request({...application(),eta:0},'/api/application'))).status,400);
@@ -29,15 +29,15 @@ test('invalid forms, cross-origin submissions and closed trips never reach provi
 });
 test('submission is successful only after Reach confirms; retries are idempotent and failure recoverable', async t => {
   const { db,directory } = await fixture(t); let calls=0; let fail=true;
-  const handler=createFormHandler({ store:()=>db,enabled:()=>true,hash:s=>s,reach:()=>({ submitForm:async()=>{calls++; if(fail)throw Error(); return {contactUuid:'c',newsletter:'not_requested'};} }) });
+  const handler=createFormHandler({ historySecret: 'unit-test-history-secret', store:()=>db,enabled:()=>true,hash:s=>s,reach:()=>({ submitForm:async()=>{calls++; if(fail)throw Error(); return {contactUuid:'c',newsletter:'not_requested'};} }) });
   const data=input();
   assert.equal((await handler(request(data))).status,503);
   fail=false;
   assert.equal((await handler(request(data))).status,200);
   assert.equal((await handler(request(data))).status,200);
   assert.equal(calls,2);
-  const records=await readdir(join(directory,'consent')); assert.equal(records.length,1);
-  const saved=JSON.parse(await readFile(join(directory,'consent',records[0]),'utf8'));
+  const records=await db.findForms(data.email); assert.equal(records.length,1);
+  const saved=records[0];
   assert.equal(saved.status,'received');assert.equal(saved.messaggio,data.messaggio);assert.equal(saved.consenso_newsletter,false);
 });
 test('concurrent submissions for one email are serialized and lock releases after failure',async t=>{
@@ -63,13 +63,14 @@ function provider({existing=true,status='subscribed',activeAutomation=false}={})
   return new Response(null,{status:204});
  }});return {reach,calls};
 }
-test('Reach keeps full long messages, preserves unrelated fields and never opts existing members out',async()=>{
- const {reach,calls}=provider();const data={...input(),kind:'contact',at:new Date().toISOString(),messaggio:'à'.repeat(5000)};
+test('Reach shows readable previews and a private history link while preserving unrelated fields and subscriptions',async()=>{
+ const {reach,calls}=provider();const data={...input(),kind:'contact',at:new Date().toISOString(),messaggio:'à'.repeat(5000),historyUrl:'https://test.example/richieste/'+'a'.repeat(64)};
  const result=await reach.submitForm(data);assert.equal(result.newsletter,'not_requested');
  const patch=calls.find(c=>c.method==='PATCH').body;
  assert.equal(patch.subscription_status,undefined);
  assert.equal(patch.fields.find(f=>f.uuid==='unrelated').value,'preserve me');
- assert.equal(fields.message.map(id=>patch.fields.find(f=>f.uuid===id).value||'').join(''),data.messaggio);
+ assert.match(patch.fields.find(f=>f.uuid===fields.message).value,/testo completo/);
+ assert.equal(patch.fields.find(f=>f.uuid===fields.history_url).value,data.historyUrl);
  assert.ok(patch.fields.every(f=>f.value===null||Array.from(f.value).length<=255));
  assert.ok(!calls.some(c=>c.url.includes('/tags/wananga-newsletter/')));
 });

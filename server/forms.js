@@ -1,4 +1,5 @@
 import { configured, json, privateKey, reachClient, sanityQuery } from './services.js';
+import { saveFormRecord } from './form-history.js';
 import { ServiceError } from './reach.js';
 
 export const FORM_PRIVACY_VERSION = 'forms-v1';
@@ -28,7 +29,7 @@ export function validateForm(input, kind) {
   }
   return data;
 }
-export function createFormHandler({ store, reach = reachClient, enabled = configured, hash = privateKey, getTrip = slug => sanityQuery('*[_type == "trip" && slug.current == $slug][0]{_id,title,status}', { slug }) }) {
+export function createFormHandler({ store, historySecret = process.env.CONSENT_HASH_SECRET, reach = reachClient, enabled = configured, hash = privateKey, getTrip = slug => sanityQuery('*[_type == "trip" && slug.current == $slug][0]{_id,title,status}', { slug }) }) {
   return async (request, context = {}) => {
     if (request.method !== 'POST') return json({ error: 'method_not_allowed' }, 405);
     if (request.headers.get('origin') !== new URL(request.url).origin) return json({ error: 'origin_not_allowed' }, 403);
@@ -53,13 +54,14 @@ export function createFormHandler({ store, reach = reachClient, enabled = config
           data.viaggio = trip.title;
         }
         const record = { ...data, at: previous?.at || new Date().toISOString(), privacyVersion: FORM_PRIVACY_VERSION, status: 'sending' };
-        await db.setJSON(key, record);
+        const token = await saveFormRecord(db, key, record, { secret: historySecret });
+        const historyUrl = new URL('/richieste/' + token, request.url).href;
         try {
-          const result = await reach().submitForm(record);
-          await db.setJSON(key, { ...record, status: 'received', contactUuid: result.contactUuid, newsletterStatus: result.newsletter });
+          const result = await reach().submitForm({ ...record, historyUrl });
+          await saveFormRecord(db, key, { ...record, status: 'received', contactUuid: result.contactUuid, newsletterStatus: result.newsletter }, { secret: historySecret });
           return json({ status: 'received', newsletter: result.newsletter });
         } catch (error) {
-          await db.setJSON(key, { ...record, status: 'failed', code: error instanceof ServiceError ? error.code : 'service_error' });
+          await saveFormRecord(db, key, { ...record, status: 'failed', code: error instanceof ServiceError ? error.code : 'service_error' }, { secret: historySecret });
           throw error;
         }
       });

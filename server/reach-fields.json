@@ -1,53 +1,15 @@
 {
   "request_kind": "d8a926dd-46d3-448f-ab3e-b4247b72f097",
   "request_at": "0c29233e-009f-4f2d-931b-f25f4f095c1c",
-  "message": [
-    "a3b045f5-18fa-4132-a50d-410eae283bd1",
-    "1a73bac8-fbc7-4b07-b735-b39ae23b0e55",
-    "5efdbcd2-cdd6-40b0-aebe-39f519f50816",
-    "47aa8101-b304-4af8-b30a-08d0aa3f53a4",
-    "0db900e0-31b3-4918-bff6-9a67d7ee7e42",
-    "0d4c2093-10ff-4287-b7b1-519be2474af7",
-    "53d2a75c-45fb-430d-9096-9a3a6506040d",
-    "cebd842e-9966-4a23-b42a-c9ae4292f530",
-    "7a5ff28e-14c1-41f9-889d-3ce401dd4414",
-    "36e09c9e-a0b5-4756-9612-6e5f06a34017",
-    "03e8b611-71aa-469f-83d8-a5f5ad6052a2",
-    "10e63e17-9c6a-4a33-8fc2-2400d708a296",
-    "7f3d4725-8e3f-44c0-9d71-04a3bdda2ea4",
-    "3f4455a3-c54d-4d55-8fa2-dbd1316fca46",
-    "35048afd-2cb2-417f-a745-c8a1de2a6fef",
-    "1f6f7809-df88-477f-8a8c-8166904a2ee6",
-    "454a359d-0461-46fb-ad5e-bc8161da5d89",
-    "ffa4e8a8-611f-46df-b8b5-58e03266804d",
-    "9c03a9bf-dd80-4df8-aeae-62036f9da9b8",
-    "397cc973-a68b-4535-88f2-7a1d844b899d"
-  ],
+  "message": "a3b045f5-18fa-4132-a50d-410eae283bd1",
   "trip": "ea86d115-8c59-47ec-bbf0-7aac12deb651",
   "age": "d689e6e0-8e20-473a-9853-631b05afac13",
   "people": "f1b77664-eaab-42dd-863a-804cee2074a5",
   "contact_time": "c067488a-386f-4b07-a09d-29d54fb11d0b",
-  "motivation": [
-    "8c05c031-13fa-42a2-a334-8ef155c303b1",
-    "a8a199b6-f9b2-4263-944e-5117aa590d7e",
-    "533c989e-5de9-46fd-bcb1-ebe752d0550f",
-    "80cc6722-2471-4cf6-8054-7ddf7dd6484e",
-    "e030463a-9baf-46f6-b837-c11ea8e1321b",
-    "6506b7f9-ec68-4ac7-8862-2a8058b4954d",
-    "1debb101-4979-43e0-ba24-04e2eac131a0",
-    "ebf07472-6ced-4405-a7ab-d0287c2d2b08"
-  ],
+  "motivation": "8c05c031-13fa-42a2-a334-8ef155c303b1",
   "experience": "961473ba-193b-4120-81e9-10b543fbd64e",
-  "notes": [
-    "dc2b513d-5171-4cf2-b339-eaed43c864ad",
-    "005fcc3d-f2f8-4f10-b6d1-fafcbab8689d",
-    "ce66e954-4e15-40a7-85e7-784ae271a31e",
-    "79e3ba77-2986-43c7-a067-49d9eb82d2b1",
-    "2e7d7a33-0187-4aa5-9e4e-46f2364e2cfc",
-    "d7a8fa91-4044-41b0-acf7-6035a999aebc",
-    "78d986e8-e055-472a-9bb7-2a99540b4253",
-    "42b3504a-5c34-4f07-9367-2061d2956135"
-  ],
+  "notes": "dc2b513d-5171-4cf2-b339-eaed43c864ad",
   "phone": "42ec9ac1-5b36-4f8f-87e0-3a73251788c6",
-  "newsletter_consent": "642c5be3-1802-4381-8088-099ab2ebf7ea"
+  "newsletter_consent": "642c5be3-1802-4381-8088-099ab2ebf7ea",
+  "history_url": "b3cb058b-13b5-4564-b48e-b29e1050194b"
 }

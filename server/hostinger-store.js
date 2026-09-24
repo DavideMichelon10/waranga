@@ -15,6 +15,18 @@ export function createHostingerStore(directory) {
       try { return JSON.parse(await readFile(join(consentDirectory, digest(key) + '.json'), 'utf8')); }
       catch (error) { if (error.code === 'ENOENT') return null; throw error; }
     },
+    async findForms(email) {
+      let names;
+      try { names = await readdir(consentDirectory); }
+      catch (error) { if (error.code === 'ENOENT') return []; throw error; }
+      const records = [];
+      for (const name of names) {
+        if (!/^[a-f0-9]{64}\.json$/.test(name)) continue;
+        const value = JSON.parse(await readFile(join(consentDirectory, name), 'utf8'));
+        if (value.email === email && value.requestId && ['contact', 'application'].includes(value.kind)) records.push(value);
+      }
+      return records;
+    },
     async withLock(key, operation) {
       const locks = join(directory, 'locks');
       await mkdir(locks, { recursive: true, mode: 0o700 });

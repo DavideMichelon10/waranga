@@ -157,12 +157,13 @@ Hostinger. Non dipendono più da PocketBase. Le richieste compaiono in Reach:
 - `wananga-newsletter`: solo per il consenso newsletter, separato e facoltativo.
 
 Aprire il contatto per leggere i campi **Wānanga · …**. Nome, email e telefono
-internazionale usano anche i campi standard. Messaggi, motivazioni e note lunghe
-sono divisi in campi numerati di 255 caratteri senza troncare il testo.
-Reach ha una scheda per email: i nuovi invii aggiornano i campi dello stesso
-modulo; il messaggio di contatto e le risposte della candidatura restano distinti.
-Le copie integrali dei tentativi e dei consensi restano nel percorso privato
-Hostinger per recupero tecnico. Non c’è un nuovo pannello da usare.
+internazionale usano anche i campi standard. I campi mostrano un’anteprima leggibile; **Wānanga · Apri richieste complete**
+contiene il collegamento riservato ai testi integrali e allo storico.
+Reach ha una scheda per email: i campi riepilogano l’ultimo invio, mentre la
+scheda completa conserva tutte le richieste, con data e consensi. I dati integrali
+restano nel percorso privato Hostinger. Non c’è un nuovo pannello da gestire: si
+apre la scheda dal collegamento nel contatto Reach. Il collegamento è una chiave
+di accesso personale: chi lo possiede può leggere lo storico e non va condiviso pubblicamente.
 
 Il server convalida i campi, controlla che il viaggio pubblicato accetti richieste,
 limita gli invii e protegge dai duplicati. In caso di errore conserva i dati nel
