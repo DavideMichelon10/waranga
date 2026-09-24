@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { isIP } from 'node:net';
 
 export class BrevoError extends Error {
   constructor(code, status = 0) { super(code); this.code = code; this.status = status; }
@@ -19,8 +20,8 @@ export function createBrevoApi({ token = process.env.BREVO_API_KEY, fetcher = fe
       const error = new BrevoError(`brevo_http_${response.status}`, response.status);
       if (response.status === 401) {
         const data = await response.json().catch(() => ({}));
-        const ip = /unrecognised IP address ((?:\d{1,3}\.){3}\d{1,3})/.exec(data.message || '')?.[1];
-        if (ip && ip.split('.').every(part => Number(part) <= 255)) error.unauthorizedIp = ip;
+        const ip = /IP address\s+([a-f0-9:.]+)/i.exec(data.message || '')?.[1]?.replace(/\.$/, '');
+        if (ip && isIP(ip)) error.unauthorizedIp = ip;
       }
       throw error;
     }

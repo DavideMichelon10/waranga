@@ -131,3 +131,10 @@ test('API refuses redirects and redacts remote error bodies', async () => {
   } });
   await assert.rejects(api('/account'), e => e.message === 'brevo_http_401' && !e.message.includes('sensitive'));
 });
+
+test('unauthorized IPv4 and IPv6 are exposed without logging the rest of the response', async () => {
+  for (const ip of ['203.0.113.10', '2001:db8::1234']) {
+    const api = createBrevoApi({ token: 'test', fetcher: async () => Response.json({ message: `Unrecognised IP address ${ip}. Secret body must not be logged.` }, { status: 401 }) });
+    await assert.rejects(api('/account'), e => e.unauthorizedIp === ip && e.message === 'brevo_http_401');
+  }
+});
