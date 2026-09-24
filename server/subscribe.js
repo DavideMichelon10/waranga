@@ -40,7 +40,9 @@ export function createSubscribeHandler(overrides = {}) {
         throw error;
       }
     } catch (error) {
-      // Never return upstream errors or log email addresses/tokens.
+      // Log only known error codes; never log payloads, upstream bodies or credentials.
+      const code = error instanceof ServiceError ? error.code : ['EACCES', 'EPERM', 'EROFS', 'ENOENT', 'ENOSPC'].includes(error.code) ? error.code : 'service_error';
+      console.error('Reach subscription failed:', code);
       return json({ error: error.code === 'rate_limit' || error.status === 429 ? 'rate_limit' : 'subscription_failed' }, error.status || 503);
     }
   };
