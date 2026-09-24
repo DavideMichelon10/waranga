@@ -170,3 +170,26 @@ test('existing tagged contacts need only lookup, details and one update', async 
   assert.equal(result.newsletter, 'subscribed');
   assert.deepEqual(calls.map(call => call.method), ['GET', 'GET', 'PATCH']);
 });
+
+
+test('contact updates preserve the last application and maintain separate dates and counts', async () => {
+  let patch;
+  const reach = createReach({ token: 'test', profileId: 'profile', fetcher: async (url, options) => {
+    if (url.includes('/contacts?')) return Response.json({ data: [{ uuid: 'c', email: 'test@example.com', subscription_status: 'subscribed' }] });
+    if (options.method === 'GET') return Response.json({ fields: [
+      { uuid: fields.trip, type: 'text', value: 'Bali' },
+      { uuid: fields.motivation, type: 'text', value: 'Previous application answer' },
+      { uuid: fields.application_at, type: 'text', value: '23/09/26, 12:00' },
+    ], tags: [{ value: 'wananga-contatti' }] });
+    patch = JSON.parse(options.body); return Response.json({ success: true });
+  } });
+  await reach.submitForm({ ...input(), kind: 'contact', at: '2026-09-24T10:00:00Z', overview: { application_count: '2', contact_count: '1', application_summary: 'Bali: 2', application_at: '23/09/26, 12:00' } });
+  const value = key => patch.fields.find(field => field.uuid === fields[key]).value;
+  assert.equal(value('trip'), 'Bali');
+  assert.equal(value('motivation'), 'Previous application answer');
+  assert.equal(value('application_at'), '23/09/26, 12:00');
+  assert.equal(value('contact_at'), '24/09/26, 12:00');
+  assert.equal(value('application_count'), '2');
+  assert.equal(value('contact_count'), '1');
+  assert.equal(patch.subscription_status, undefined);
+});

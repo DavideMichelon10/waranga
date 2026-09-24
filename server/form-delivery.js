@@ -1,3 +1,4 @@
+import { contactSummary } from './contact-summary.js';
 import { saveFormRecord, historyToken } from './form-history.js';
 import { privateKey, reachClient } from './services.js';
 import { ServiceError } from './reach.js';
@@ -19,7 +20,9 @@ export function createFormDelivery({ store, origin, historySecret = process.env.
         const historyUrl = new URL('/richieste/' + historyToken(record.email, historySecret), origin).href;
         let update;
         try {
-          const result = await reach().submitForm({ ...record, historyUrl });
+          const archive = await db.getJSON('form-history/' + historyToken(record.email, historySecret));
+          const overview = contactSummary(archive?.records || [record]);
+          const result = await reach().submitForm({ ...record, historyUrl, overview });
           update = { ...record, status: 'received', contactUuid: result.contactUuid, newsletterStatus: result.newsletter, nextAttemptAt: null, code: null };
         } catch (error) {
           const code = error instanceof ServiceError ? error.code : error.name === 'TimeoutError' ? 'reach_timeout' : 'reach_unavailable';

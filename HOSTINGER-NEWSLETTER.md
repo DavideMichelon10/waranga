@@ -186,3 +186,22 @@ salvati in Reach. Il percorso `PRIVATE_DATA_DIR` va mantenuto nei backup Hosting
 la sopravvivenza ai deploy è verificata, un backup esterno non è configurato da
 questa integrazione. La cancellazione di un contatto Reach non elimina da sola
 le copie private: gestire entrambe secondo la conservazione definita dal titolare.
+
+
+## Organizzazione della scheda Reach
+
+I nomi dei campi distinguono quattro gruppi: `01 Riepilogo`, `02 Ultima candidatura`,
+`03 Ultimo messaggio`, `04 Consensi`. È un raggruppamento tramite etichette: il
+layout e l’ordine visuale della scheda rimangono quelli previsti da Reach.
+
+Il riepilogo mostra numero di candidature ricevute, numero di messaggi Contattaci,
+candidature per viaggio, modulo e data dell’ultimo invio, collegamento allo storico.
+I conteggi includono i record ricevuti e in coda; escludono tentativi falliti e non
+contano più volte lo stesso ID. Newsletter e liste d’attesa restano riconoscibili
+dai loro tag e non rientrano nel conteggio delle candidature o dei messaggi.
+
+Ogni tipo di modulo ha la propria data. Un nuovo messaggio non sovrascrive le
+risposte o la data dell’ultima candidatura. La voce newsletter riporta la scelta
+nell’ultimo invio, non sostituisce lo stato di iscrizione nativo del contatto.
+I riepiloghi si aggiornano durante la sincronizzazione con Reach. Le candidature
+precedenti e i testi integrali restano disponibili nello storico collegato.

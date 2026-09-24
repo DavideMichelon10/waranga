@@ -1,3 +1,4 @@
+import { contactDate } from './contact-summary.js';
 import formFields from './reach-fields.json' with { type: 'json' };
 
 export class ServiceError extends Error {
@@ -94,10 +95,11 @@ export function createReach({ token, profileId, fetcher = fetch, pause = ms => n
       contact ||= await waitForContact(data.email);
       if (!contact) throw new ServiceError('contact_not_ready');
     }
-    const values = { request_kind: data.kind === 'contact' ? 'Contattaci' : 'Candidatura', request_at: data.at, newsletter_consent: data.consenso_newsletter ? 'Sì' : 'No' };
+    const values = { request_kind: data.kind === 'contact' ? 'Contattaci' : 'Candidatura', request_at: contactDate(data.at), newsletter_consent: data.consenso_newsletter ? 'Sì' : 'No' };
+    if (data.overview) Object.assign(values, data.overview);
     if (data.historyUrl) values.history_url = data.historyUrl;
-    if (data.kind === 'contact') values.message = data.messaggio;
-    else Object.assign(values, { trip: data.viaggio, age: String(data.eta), people: data.numero_persone, contact_time: data.contatto_preferito, motivation: data.motivazione, experience: data.esperienza_gruppo, notes: data.info_utili, phone: data.telefono });
+    if (data.kind === 'contact') Object.assign(values, { message: data.messaggio, contact_at: contactDate(data.at) });
+    else Object.assign(values, { application_at: contactDate(data.at), trip: data.viaggio, age: String(data.eta), people: data.numero_persone, contact_time: data.contatto_preferito, motivation: data.motivazione, experience: data.esperienza_gruppo, notes: data.info_utili, phone: data.telefono });
     const fields = Object.entries(values).flatMap(([key, value]) => {
       const ids = Array.isArray(formFields[key]) ? formFields[key] : [formFields[key]];
       const chars = Array.from(value);
