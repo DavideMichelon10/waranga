@@ -1,6 +1,7 @@
 import test from 'node:test';
+import { createHash } from 'node:crypto';
 import assert from 'node:assert/strict';
-import { mkdtemp, writeFile, readdir, readFile, rm, symlink } from 'node:fs/promises';
+import { mkdtemp, writeFile, readdir, readFile, rm, symlink, mkdir, utimes } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createHostingerStore } from '../server/hostinger-store.js';
@@ -55,4 +56,22 @@ test('Hostinger serves SPA and validates newsletter requests before reaching pro
   assert.equal(result.status, 200);
   assert.equal((await result.json()).status, 'pending_confirmation');
   assert.equal(calls, 1);
+});
+
+
+test('a lock orphaned by a deployment recovers without deleting saved requests', async t => {
+  const directory = await fixture(t);
+  const db = createHostingerStore(directory);
+  await db.setJSON('saved-request', { message: 'Keep this request' });
+  const lock = join(directory, 'locks', createHash('sha256').update('contact').digest('hex'));
+  await mkdir(lock, { recursive: true });
+  await assert.rejects(db.withLock('contact', async () => {}), { code: 'request_in_progress' });
+  const stale = new Date(Date.now() - 60000);
+  await utimes(lock, stale, stale);
+  let calls = 0;
+  await db.withLock('contact', async () => { calls++; });
+  await db.withLock('contact', async () => { calls++; });
+  assert.equal(calls, 2);
+  assert.deepEqual(await db.getJSON('saved-request'), { message: 'Keep this request' });
+  assert.deepEqual(await readdir(join(directory, 'locks')), []);
 });

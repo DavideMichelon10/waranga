@@ -1,4 +1,5 @@
-import { mkdir, writeFile, rename, unlink, readdir, readFile, rm } from 'node:fs/promises';
+import lockfile from 'proper-lockfile';
+import { mkdir, writeFile, rename, unlink, readdir, readFile } from 'node:fs/promises';
 import { createHash, randomUUID } from 'node:crypto';
 import { isAbsolute, join } from 'node:path';
 import { ServiceError } from './reach.js';
@@ -31,9 +32,16 @@ export function createHostingerStore(directory) {
       const locks = join(directory, 'locks');
       await mkdir(locks, { recursive: true, mode: 0o700 });
       const lock = join(locks, digest(key));
-      try { await mkdir(lock, { mode: 0o700 }); }
-      catch (error) { if (error.code === 'EEXIST') throw new ServiceError('request_in_progress', 409); throw error; }
-      try { return await operation(); } finally { await rm(lock, { recursive: true, force: true }); }
+      let release;
+      try {
+        // Renew while an operation runs; recover orphaned locks after a deploy/crash.
+        // Keep the old directory path so pre-existing orphaned locks also recover.
+        release = await lockfile.lock(lock, { lockfilePath: lock, realpath: false, stale: 30000, update: 5000, retries: 0 });
+      } catch (error) {
+        if (error.code === 'ELOCKED') throw new ServiceError('request_in_progress', 409);
+        throw error;
+      }
+      try { return await operation(); } finally { await release(); }
     },
     async setJSON(key, value) {
       await mkdir(consentDirectory, { recursive: true, mode: 0o700 });
