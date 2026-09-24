@@ -83,7 +83,7 @@ Vite può rimuovere il backend.
   perché l’endpoint accetta solo POST.
 - Iscrizione dal dominio pubblico con un indirizzo autorizzato dal proprietario:
   HTTP 200, stato `subscribed`. Contatto verificato anche tramite API Reach.
-- I 13 test automatici e la build frontend sono passati.
+- I 20 test automatici e la build frontend sono passati.
 - Il primo tentativo online restituiva `reach_401`: le variabili runtime sono
   state aggiornate con il token verificato. Non inserire mai `********` come
   credenziale: l’API di lettura Hostinger restituisce soltanto valori mascherati.
@@ -96,8 +96,8 @@ Vite può rimuovere il backend.
 - I log riportano solo codici di errore noti, senza indirizzi email o token.
 
 Le campagne e le eventuali automazioni email si gestiscono nel pannello Reach.
-La prova online riguarda la newsletter; le liste d’attesa condividono il backend
-ma richiedono anche un documento Sanity pubblicato con stato di raccolta aperto.
+Le prove online coprono newsletter, lista d’attesa Bali, Contattaci e candidatura
+Bali. Le liste richiedono un documento Sanity pubblicato con raccolta aperta.
 
 ## Contattaci e candidature direttamente in Reach
 
@@ -128,3 +128,14 @@ Per la prova locale completa avviare `app.js` con variabili server, origine loca
 e una directory privata di test esterna al progetto. Il server Vite di sviluppo
 lascia i nuovi moduli in standby. I vecchi componenti dell’export non montati
 dall’applicazione pubblica restano separati; il sito usa `src/redesign/Experience.jsx`.
+
+## Dominio Hostinger e nuovi contatti
+
+L’origine `https://darkblue-alligator-613930.hostingersite.com` è stata aggiunta
+alle origini CORS di Sanity senza credenziali: viaggi e waiting list sono ora
+leggibili nel browser pubblico. Questa impostazione è esterna al deploy Git.
+
+Reach può accettare una creazione prima di rendere il nuovo contatto ricercabile.
+Il backend effettua tentativi di lettura con attese brevi prima di aggiornare
+campi e tag. Se il contatto non diventa disponibile, segnala errore e conserva
+la richiesta per il nuovo tentativo, senza dichiarare una consegna inesistente.

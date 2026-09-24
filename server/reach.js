@@ -7,7 +7,7 @@ export class ServiceError extends Error {
 export const audienceName = id => `wananga-wait-${createHash('sha256').update(id).digest('hex').slice(0, 24)}`;
 export const NEWSLETTER_TAG = 'wananga-newsletter';
 
-export function createReach({ token, profileId, fetcher = fetch }) {
+export function createReach({ token, profileId, fetcher = fetch, pause = ms => new Promise(resolve => setTimeout(resolve, ms)) }) {
   if (!token || !/^[a-zA-Z0-9-]+$/.test(profileId || '')) throw new ServiceError('not_configured');
   const base = `https://developers.hostinger.com/api/reach/v1/profiles/${profileId}`;
   const unwrap = value => value?.data ?? value;
@@ -31,6 +31,15 @@ export function createReach({ token, profileId, fetcher = fetch }) {
     }
     throw new ServiceError('contact_search_limit');
   }
+  async function waitForContact(email) {
+    // Reach acknowledges creation before the contact is necessarily queryable.
+    for (const delay of [0, 500, 1500, 3000]) {
+      if (delay) await pause(delay);
+      const contact = await findContact(email);
+      if (contact) return contact;
+    }
+    return null;
+  }
   async function ensureTags(names) {
     const tags = unwrap(await request('/tags', 'POST', { names }));
     if (!Array.isArray(tags) || names.some(name => !tags.find(tag => tag.value === name && tag.uuid))) throw new ServiceError('invalid_reach_tags');
@@ -51,7 +60,7 @@ export function createReach({ token, profileId, fetcher = fetch }) {
         contact = await findContact(email);
         if (!contact) throw error;
       }
-      contact ||= await findContact(email);
+      contact ||= await waitForContact(email);
       if (!contact) return { status: 'accepted' };
     }
     if (!['subscribed', 'pending'].includes(contact.subscription_status)) throw new ServiceError('contact_not_subscribable', 409);
@@ -77,7 +86,7 @@ export function createReach({ token, profileId, fetcher = fetch }) {
         contact = await findContact(data.email);
         if (!contact) throw error;
       }
-      contact ||= await findContact(data.email);
+      contact ||= await waitForContact(data.email);
       if (!contact) throw new ServiceError('contact_not_ready');
     }
     const values = { request_kind: data.kind === 'contact' ? 'Contattaci' : 'Candidatura', request_at: data.at, newsletter_consent: data.consenso_newsletter ? 'Sì' : 'No' };

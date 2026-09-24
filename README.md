@@ -27,7 +27,7 @@ Non caricare file `.env`, credenziali o database nel repository.
 - La newsletter mostra un modulo con sola email in homepage e su /newsletter.
 - Newsletter Reach attiva sul dominio di prova Hostinger; iscrizione online verificata il 24 settembre 2026. Configurazione e limiti in [HOSTINGER-NEWSLETTER.md](HOSTINGER-NEWSLETTER.md). `REACH_ENABLED=false` permette di disattivare la raccolta.
 - Studio pubblicato: https://wananga-v6jdx1wm.sanity.studio/
-- Dominio frontend autorizzato in Sanity: https://wananga.it (anche https://www.wananga.it)
+- Domini frontend autorizzati in Sanity: https://wananga.it, https://www.wananga.it e https://darkblue-alligator-613930.hostingersite.com (lettura pubblica senza credenziali).
 - Bali (con fotografia) e Testi del sito sono già stati importati come bozze. Accedere al pannello con GitHub, rivederli e premere Publish.
 - L'anteprima grafica affiancata (Visual Editing) non è inclusa: questo Studio è un editor a campi.
 

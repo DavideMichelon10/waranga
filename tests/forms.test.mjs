@@ -98,3 +98,17 @@ test('application data maps to Reach and opt-in adds only the newsletter tag whe
  assert.ok(calls.some(c=>c.url.includes('/tags/wananga-newsletter/')));
  assert.equal(tripRequestPath({slug:'thailandia'}),'/candidatura/thailandia');
 });
+
+test('new Reach contacts can become queryable after the create acknowledgement', async () => {
+  let searches = 0; let patches = 0; const delays = [];
+  const reach = createReach({ token: 'test', profileId: 'p', pause: async ms => delays.push(ms), fetcher: async (url, options) => {
+    if (url.includes('/contacts?')) return Response.json({ data: ++searches < 3 ? [] : [{ uuid: 'new', email: 'test@example.com', subscription_status: 'subscribed', note: 'wananga-contact-only' }] });
+    if (url.includes('/automations?')) return Response.json({ data: [] });
+    if (url.endsWith('/contacts/new') && options.method === 'GET') return Response.json({ fields: [] });
+    if (url.endsWith('/contacts/new') && options.method === 'PATCH') { patches++; return Response.json({ success: true }); }
+    if (url.endsWith('/tags')) return Response.json({ data: JSON.parse(options.body).names.map(value => ({ uuid: value, value })) });
+    return Response.json({ message: 'Request accepted' });
+  } });
+  const result = await reach.submitForm({ ...input(), kind: 'contact', at: new Date().toISOString() });
+  assert.equal(result.contactUuid, 'new'); assert.equal(patches, 1); assert.deepEqual(delays, [500]);
+});
