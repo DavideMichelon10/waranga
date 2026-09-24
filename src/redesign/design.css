@@ -8,7 +8,7 @@
 }
 .cms-state { padding: 32px 0; }
 .cms-state .wa-button { margin-top: 24px; }
-.newsletter-form { min-width: 0; }
+.newsletter-container { min-width: 0; }
 .newsletter-form { max-width: 540px; }
 .newsletter-form .wa-button { max-width: 100%; white-space: normal; }
 .newsletter-form .form-note { margin-top: 0; }
@@ -563,7 +563,7 @@
   --symbol-size: 68px;
   margin-bottom: 24px;
 }
-.home-newsletter .newsletter-form {
+.home-newsletter .newsletter-container {
   padding: 36px;
   border-radius: 28px 28px 56px 28px;
   background: var(--wa-paper);
@@ -1242,7 +1242,7 @@
   .header-inner { gap: 16px; }
   .hero-signature { font-size: 15px; margin-bottom: 20px; letter-spacing: 0.1em; }
   .newsletter-intro .brand-symbol { --symbol-size: 52px; margin-bottom: 20px; }
-  .home-newsletter .newsletter-form { padding: 24px; border-radius: 24px 24px 40px 24px; }
+  .home-newsletter .newsletter-container { padding: 24px; border-radius: 24px 24px 40px 24px; }
   .coast-hero {
     margin: 0 12px;
     border-radius: 28px 28px 56px 28px;
