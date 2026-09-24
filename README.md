@@ -2,7 +2,7 @@
 
 ## Sviluppo locale
 
-Repository: https://github.com/DavideMichelon10/waranga
+Repository: https://github.com/ftimay-cloud/wananga
 
 Con Node.js 22.12 o successivo:
 

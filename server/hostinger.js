@@ -3,12 +3,12 @@ import { readFile, realpath } from 'node:fs/promises';
 import { resolve, extname, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { handleHistory } from './form-history.js';
-import { createFormDelivery } from './form-delivery.js';
 import { createBrevoDelivery } from './brevo-delivery.js';
 import { createFormTrips } from './form-trips.js';
 import { createFormHandler } from './forms.js';
 import { createSubscribeHandler } from './subscribe.js';
 import { createHostingerStore } from './hostinger-store.js';
+import { configured } from './services.js';
 
 const projectDirectory = fileURLToPath(new URL('../', import.meta.url));
 const mime = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.avif': 'image/avif', '.ico': 'image/x-icon', '.woff': 'font/woff', '.woff2': 'font/woff2', '.txt': 'text/plain; charset=utf-8', '.xml': 'application/xml', '.mp4': 'video/mp4' };
@@ -22,15 +22,12 @@ export function createHostingerServer({ origin = process.env.PUBLIC_ORIGIN, dire
     if (privateRoot === staticRoot || privateRoot.startsWith(staticRoot + sep) || privateRoot === resolve(projectDirectory) || privateRoot.startsWith(resolve(projectDirectory) + sep)) throw new Error('PRIVATE_DATA_DIR must be outside the application and public directory');
   }
   let store;
-  const subscribe = handler || createSubscribeHandler({
-    store: () => (store ||= createHostingerStore(directory)),
-    limit: (storage, key, limit) => storage.limit(key, limit),
-  });
   const formStore = () => (store ||= createHostingerStore(directory));
-  const delivery = createFormDelivery({ store: formStore, origin });
-  const brevo = process.env.BREVO_TRIAL_ENABLED === 'true' && process.env.BREVO_API_KEY ? createBrevoDelivery({ store: formStore }) : null;
+  const delivery = createBrevoDelivery({ store: formStore });
+  const wake = () => { void delivery.kick(); };
+  const subscribe = handler || createSubscribeHandler({ store: formStore, limit: (storage, key, limit) => storage.limit(key, limit), wake });
   const trips = createFormTrips({ store: formStore });
-  const forms = createFormHandler({ store: formStore, getTrip: trips.get, wake: () => { void delivery.kick(); void brevo?.kick(); } });
+  const forms = createFormHandler({ store: formStore, getTrip: trips.get, wake });
   const server = createServer(async (req, res) => {
     const sendJson = (status, error) => { res.writeHead(status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify({ error })); };
     try {
@@ -81,12 +78,11 @@ export function createHostingerServer({ origin = process.env.PUBLIC_ORIGIN, dire
     } catch { sendJson(503, 'service_unavailable'); }
   });
   server.on('listening', () => {
-    if (!directory || process.env.REACH_ENABLED !== 'true') return;
+    if (!directory || !configured()) return;
     delivery.start();
-    brevo?.start();
     void trips.refresh().catch(() => console.error('Form trip catalog refresh delayed'));
   });
-  server.on('close', () => { delivery.stop(); brevo?.stop(); });
+  server.on('close', () => { delivery.stop(); });
   return server;
 }
 

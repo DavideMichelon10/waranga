@@ -24,7 +24,7 @@ import {
 import { submitForm } from "../lib/forms";
 import { ContentProvider, useContent } from "../contexts/ContentContext";
 import { acceptsRequests, tripRequestPath } from "../lib/content";
-import ReachNewsletter from "../components/ReachNewsletter";
+import NewsletterForm from "../components/NewsletterForm";
 import AgencyFooter from "../components/AgencyFooter";
 import WaitingList from "../components/WaitingList";
 import "./design.css";
@@ -296,7 +296,7 @@ function Newsletter() {
       <h1 className="preserve-lines">{settings.newsletterTitle}</h1>
       <p className="lead-text">{settings.newsletterDescription}</p>
     </div>
-    <div className="form-panel"><ReachNewsletter copy={settings.siteCopy} /></div>
+    <div className="form-panel"><NewsletterForm copy={settings.siteCopy} /></div>
   </section>;
 }
 function Home() {
@@ -367,7 +367,7 @@ function Home() {
             <h2 className="preserve-lines">{settings.newsletterTitle}</h2>
             <p>{settings.newsletterDescription}</p>
           </div>
-          <ReachNewsletter copy={copy} />
+          <NewsletterForm copy={copy} />
         </div>
       </section>
     </div>

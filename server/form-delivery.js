@@ -1,7 +1,7 @@
 import { contactSummary } from './contact-summary.js';
 import { saveFormRecord, historyToken } from './form-history.js';
 import { privateKey, reachClient } from './services.js';
-import { ServiceError } from './reach.js';
+import { ServiceError } from './errors.js';
 
 // The saved request is the queue: no in-memory-only jobs or second data store.
 export function createFormDelivery({ store, origin, historySecret = process.env.CONSENT_HASH_SECRET, hash = privateKey, reach = reachClient, now = Date.now }) {

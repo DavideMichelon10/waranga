@@ -28,7 +28,7 @@ function WaitingListForm({ item }) {
   if (["subscribed", "pending_confirmation", "accepted"].includes(status)) return (
     <div className="waiting-success" role="status">
       <Check aria-hidden="true" /><h2>{status === "subscribed" ? "Sei nella lista." : "Richiesta ricevuta."}</h2>
-      <p>{status === "pending_confirmation" ? "Controlla la tua email e conferma l’iscrizione per ricevere l’avviso." : status === "accepted" ? "Se è necessaria una conferma, riceverai un’email con le istruzioni. Controlla anche la posta indesiderata." : "Ti avviseremo via email quando il viaggio sarà disponibile."}</p>
+      <p>{status === "pending_confirmation" ? "Controlla la tua email e conferma l’iscrizione per ricevere l’avviso." : status === "accepted" ? "La tua richiesta è stata ricevuta e salvata." : "Ti avviseremo via email quando il viaggio sarà disponibile."}</p>
     </div>
   );
   return <form className="wa-form" onSubmit={submit} aria-busy={status === "sending"}>

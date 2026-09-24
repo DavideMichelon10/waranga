@@ -1,14 +1,13 @@
 import { createHmac } from 'node:crypto';
 import { getStore } from '@netlify/blobs';
-import { createReach, ServiceError } from './reach.js';
+import { ServiceError } from './errors.js';
 import { SANITY_PROJECT_ID, SANITY_DATASET } from '../src/lib/integrations.js';
 
 export const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
 export function privateStore() { return getStore({ name: 'wananga-private', consistency: 'strong' }); }
 export function configured(env = process.env) {
-  return env.REACH_ENABLED === 'true' && Boolean(env.REACH_API_TOKEN && env.REACH_PROFILE_ID && env.CONSENT_HASH_SECRET);
+  return env.BREVO_ENABLED === 'true' && Boolean(env.BREVO_API_KEY && env.CONSENT_HASH_SECRET);
 }
-export const reachClient = () => createReach({ token: process.env.REACH_API_TOKEN, profileId: process.env.REACH_PROFILE_ID });
 export function privateKey(value, secret = process.env.CONSENT_HASH_SECRET) {
   if (!secret) throw new ServiceError('not_configured');
   return createHmac('sha256', secret).update(value).digest('hex');

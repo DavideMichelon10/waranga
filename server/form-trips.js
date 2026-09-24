@@ -1,5 +1,5 @@
 import { sanityQuery } from './services.js';
-import { ServiceError } from './reach.js';
+import { ServiceError } from './errors.js';
 
 // Warm and persist the small trip catalog; submitting a form usually needs no CMS call.
 export function createFormTrips({ store, now = Date.now, query = () => sanityQuery('*[_type == "trip"]{title,status,"slug":slug.current}', {}, (url, options) => fetch(url, { ...options, signal: AbortSignal.timeout(3000) })) }) {

@@ -77,7 +77,7 @@ Vite può rimuovere il backend.
 ## Verifica online del 24 settembre 2026
 
 - Sito: https://darkblue-alligator-613930.hostingersite.com/.
-- Deploy collegato a `DavideMichelon10/waranga`, branch `main`.
+- Dopo il trasferimento dei sorgenti, verificare nel pannello Hostinger che il deploy punti a `ftimay-cloud/wananga`, branch `main`.
 - Configurazione funzionante: Express, Node 22, build `build`, output vuoto,
   entry file `app.js`. Homepage HTTP 200; GET `/api/newsletter` HTTP 405,
   perché l’endpoint accetta solo POST.

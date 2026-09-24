@@ -1,8 +1,7 @@
 import { randomUUID } from 'node:crypto';
-import { trialEligible } from './brevo.js';
 import { configured, json, privateKey, sanityQuery } from './services.js';
 import { saveFormRecord } from './form-history.js';
-import { ServiceError } from './reach.js';
+import { ServiceError } from './errors.js';
 
 export const FORM_PRIVACY_VERSION = 'forms-v1';
 const text = (value, maximum, optional = false) => {
@@ -31,7 +30,7 @@ export function validateForm(input, kind) {
   }
   return data;
 }
-export function createFormHandler({ store, historySecret = process.env.CONSENT_HASH_SECRET, wake = () => {}, brevoEligible = trialEligible, enabled = configured, hash = privateKey, getTrip = slug => sanityQuery('*[_type == "trip" && slug.current == $slug][0]{_id,title,status}', { slug }) }) {
+export function createFormHandler({ store, historySecret = process.env.CONSENT_HASH_SECRET, wake = () => {}, enabled = configured, hash = privateKey, getTrip = slug => sanityQuery('*[_type == "trip" && slug.current == $slug][0]{_id,title,status}', { slug }) }) {
   return async (request, context = {}) => {
     if (request.method !== 'POST') return json({ error: 'method_not_allowed' }, 405);
     if (request.headers.get('origin') !== new URL(request.url).origin) return json({ error: 'origin_not_allowed' }, 403);
@@ -44,8 +43,8 @@ export function createFormHandler({ store, historySecret = process.env.CONSENT_H
       const legacyContact = path === '/hcgi/platform/api/collections/contatti/records';
       const legacyApplication = path === '/hcgi/platform/api/collections/candidature/records';
       const kind = path === '/api/contact' || legacyContact ? 'contact' : 'application';
-      // Tabs opened before the Reach migration still submit the PocketBase payload.
-      // Keep the same validation, consent checks, storage and Reach delivery path.
+      // Tabs opened before the previous backend still submit the PocketBase payload.
+      // Keep the same validation, consent checks, storage and Brevo delivery path.
       if ((legacyContact || legacyApplication) && input && typeof input === 'object' && !Array.isArray(input)) {
         input = { ...input, requestId: input.requestId || randomUUID() };
         if (legacyApplication) {
@@ -69,11 +68,11 @@ export function createFormHandler({ store, historySecret = process.env.CONSENT_H
           if (!trip || !['interest','open'].includes(trip.status)) throw new ServiceError('trip_closed', 409);
           data.viaggio = trip.title;
         }
-        const record = { ...data, at: previous?.at || new Date().toISOString(), privacyVersion: FORM_PRIVACY_VERSION, status: 'queued', ...(brevoEligible(data.email) ? { brevoTrial: true } : {}) };
+        const record = { ...data, at: previous?.at || new Date().toISOString(), privacyVersion: FORM_PRIVACY_VERSION, status: 'queued', provider: 'brevo' };
         await saveFormRecord(db, key, record, { secret: historySecret });
         return json({ status: 'received', newsletter: data.consenso_newsletter ? 'requested' : 'not_requested' });
       });
-      // The request is durable before confirming. Reach delivery can resume after a restart.
+      // The request is durable before confirming. Brevo delivery can resume after a restart.
       wake();
       return response;
     } catch (error) {

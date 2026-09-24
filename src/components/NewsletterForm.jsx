@@ -4,7 +4,7 @@ import { ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
 import { newsletterEnabled, subscribeToNewsletter } from "../lib/newsletter";
 
-export default function ReachNewsletter({ copy }) {
+export default function NewsletterForm({ copy }) {
   const id = useId();
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState("idle");
@@ -34,7 +34,7 @@ export default function ReachNewsletter({ copy }) {
     error: error || copy.newsletterError,
     subscribed: copy.newsletterSuccess,
     pending_confirmation: copy.newsletterConfirm,
-    accepted: "Richiesta ricevuta. Controlla la tua email per eventuali istruzioni di conferma.",
+    accepted: "Richiesta di iscrizione ricevuta. Grazie!",
   }[status];
 
   return (

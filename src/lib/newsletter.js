@@ -1,9 +1,12 @@
 import { WAITLIST_PRIVACY_VERSION } from './waitlists.js';
 
+const pending = new Map();
 async function subscribe(payload, path) {
+  const key = path + ':' + JSON.stringify(payload);
+  if (!pending.has(key)) pending.set(key, crypto.randomUUID());
   const response = await fetch(path, {
     method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    credentials: 'omit', body: JSON.stringify({ ...payload, privacyVersion: WAITLIST_PRIVACY_VERSION }),
+    credentials: 'omit', body: JSON.stringify({ ...payload, requestId: pending.get(key), privacyVersion: WAITLIST_PRIVACY_VERSION }),
     signal: AbortSignal.timeout(30000),
   });
   let result;
@@ -17,6 +20,7 @@ async function subscribe(payload, path) {
     };
     throw new Error(messages[result.error] || 'Non siamo riusciti a completare l’iscrizione. Riprova tra poco.');
   }
+  pending.delete(key);
   return result.status;
 }
 export const newsletterEnabled = true;

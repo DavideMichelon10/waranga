@@ -2,7 +2,7 @@ import lockfile from 'proper-lockfile';
 import { mkdir, writeFile, rename, unlink, readdir, readFile } from 'node:fs/promises';
 import { createHash, randomUUID } from 'node:crypto';
 import { isAbsolute, join } from 'node:path';
-import { ServiceError } from './reach.js';
+import { ServiceError } from './errors.js';
 
 // Keep this directory outside public_html and all deployment/build directories.
 export function createHostingerStore(directory) {
@@ -15,6 +15,20 @@ export function createHostingerStore(directory) {
     async getJSON(key) {
       try { return JSON.parse(await readFile(join(consentDirectory, digest(key) + '.json'), 'utf8')); }
       catch (error) { if (error.code === 'ENOENT') return null; throw error; }
+    },
+    async storedRecords() {
+      let names;
+      try { names = await readdir(consentDirectory); }
+      catch (error) { if (error.code === 'ENOENT') return []; throw error; }
+      const records = [];
+      for (const name of names) {
+        if (!/^[a-f0-9]{64}\.json$/.test(name)) continue;
+        records.push({ file: name, value: JSON.parse(await readFile(join(consentDirectory, name), 'utf8')) });
+      }
+      return records;
+    },
+    async findDeliverableRecords() {
+      return (await this.storedRecords()).map(r => r.value).filter(r => r.requestId && r.provider === 'brevo' && ['contact', 'application', 'newsletter', 'waitlist'].includes(r.kind));
     },
     async findPendingForms() {
       return (await this.findForms()).filter(record => record.status === 'queued');
