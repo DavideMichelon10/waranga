@@ -1,10 +1,15 @@
-import { createHash } from 'node:crypto';
 import formFields from './reach-fields.json' with { type: 'json' };
 
 export class ServiceError extends Error {
   constructor(code, status = 503) { super(code); this.code = code; this.status = status; }
 }
-export const audienceName = id => `wananga-wait-${createHash('sha256').update(id).digest('hex').slice(0, 24)}`;
+export function audienceName(waitlist) {
+  // The published slug identifies the departure and stays stable when its title changes.
+  const slug = typeof waitlist.slug === 'string' ? waitlist.slug : waitlist.slug?.current;
+  if (typeof slug !== 'string' || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) || slug.length > 200) throw new ServiceError('invalid_waitlist');
+  const label = slug.replaceAll('-', ' ');
+  return `Lista d’attesa · ${label[0].toUpperCase()}${label.slice(1)}`;
+}
 export const NEWSLETTER_TAG = 'wananga-newsletter';
 
 export function createReach({ token, profileId, fetcher = fetch, pause = ms => new Promise(resolve => setTimeout(resolve, ms)) }) {

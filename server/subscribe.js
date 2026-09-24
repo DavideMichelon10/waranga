@@ -27,7 +27,7 @@ export function createSubscribeHandler(overrides = {}) {
       await deps.limit(store, 'reach-subscriptions', 10);
       const item = waiting ? await deps.getWaitlist(input.waitlistId) : null;
       if (waiting && (!item || item.status !== 'collecting')) return json({ error: 'list_closed' }, 409);
-      const names = [...(waiting ? [audienceName(item._id)] : []), ...(input.newsletter ? [NEWSLETTER_TAG] : [])];
+      const names = [...(waiting ? [audienceName(item)] : []), ...(input.newsletter ? [NEWSLETTER_TAG] : [])];
       const key = `consent/${deps.hash(email)}/${randomUUID()}`;
       const consent = { email, at: new Date().toISOString(), waitlistId: item?._id || null, newsletter: input.newsletter, privacyVersion: WAITLIST_PRIVACY_VERSION, waitlistConsent: waiting ? WAITLIST_CONSENT : null, newsletterConsent: input.newsletter ? (waiting ? NEWSLETTER_CONSENT : GENERAL_NEWSLETTER_CONSENT) : null, status: 'requested' };
       await store.setJSON(key, consent);

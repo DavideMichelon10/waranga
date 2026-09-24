@@ -20,7 +20,7 @@ function store() {
 }
 const request = (body, path = '/api/waitlist') => new Request(`https://wananga.it${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: 'https://wananga.it' }, body: JSON.stringify(body) });
 const signup = { email: 'hello@example.com', waitlistId: 'waiting-bali-2027', privacy: true, newsletter: false };
-const list = { _id: signup.waitlistId, title: 'Bali', status: 'collecting' };
+const list = { _id: signup.waitlistId, title: 'Bali', slug: { current: 'bali-2027' }, status: 'collecting' };
 
 test('standby never writes contacts or consent; validation precedes all side effects', async () => {
   let writes = 0;
@@ -34,9 +34,9 @@ test('waiting list and newsletter choices are independent and consent is stored 
   const db = store(); const calls = [];
   const handle = createSubscribeHandler({ configured: () => true, store: () => db, hash: () => 'email-hash', limit: async () => {}, getWaitlist: async () => list, reach: () => ({ subscribe: async (email, names) => { calls.push(names); return { status: 'pending_confirmation' }; } }) });
   assert.equal((await handle(request(signup))).status, 200);
-  assert.deepEqual(calls[0], [audienceName(list._id)]);
+  assert.deepEqual(calls[0], [audienceName(list)]);
   await handle(request({ ...signup, newsletter: true }));
-  assert.deepEqual(calls[1], [audienceName(list._id), NEWSLETTER_TAG]);
+  assert.deepEqual(calls[1], [audienceName(list), NEWSLETTER_TAG]);
   assert.equal(db.entries.size, 2);
   assert.deepEqual([...db.entries.values()].map(entry => entry.data.newsletter), [false, true]);
 });
@@ -93,4 +93,14 @@ test('catalog remains independent from waiting lists, missing trips never create
   assert.equal(content.trips.length, 1); assert.equal(content.waitlists.length, 1);
   assert.equal(waitlistPhase({ status: 'available', trip: null }), 'unavailable');
   assert.equal(waitlistPhase({ status: 'available', trip: { slug: 'bali' } }), 'available');
+});
+
+
+test('waiting list tags are readable, distinct by departure, and stable across title changes', () => {
+  const bali = { _id: 'internal-id', title: 'Bali', slug: { current: 'bali-prossima-partenza' } };
+  assert.equal(audienceName(bali), 'Lista d’attesa · Bali prossima partenza');
+  assert.equal(audienceName({ ...bali, title: 'Nuovo titolo editoriale' }), audienceName(bali));
+  assert.notEqual(audienceName({ ...bali, slug: 'bali-2027' }), audienceName(bali));
+  assert.equal(audienceName({ slug: 'thailandia-2027' }), 'Lista d’attesa · Thailandia 2027');
+  assert.throws(() => audienceName({ slug: '' }), { code: 'invalid_waitlist' });
 });

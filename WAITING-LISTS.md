@@ -75,7 +75,11 @@ con storage usare Netlify Dev. Vite non carica i segreti server dai file `.env`.
 
 ## Contatti e consensi
 
-Il tag `wananga-wait-…` identifica stabilmente il documento Sanity della lista.
+Il tag usa un nome leggibile derivato dallo slug: per esempio
+`Lista d’attesa · Bali prossima partenza`. Cambiare il titolo della pagina non
+modifica il tag. Mantieni lo slug di una lista già in uso: cambiarlo crea un nuovo
+nome di tag e richiede una migrazione degli iscritti. Il precedente tag tecnico
+Bali è stato rinominato conservando lo stesso identificativo Reach e gli iscritti.
 La stessa email può iscriversi a più viaggi. La newsletter generale aggiunge il tag
 `wananga-newsletter` solo quando richiesta; non selezionarla non revoca eventuali
 iscrizioni precedenti. I contatti già disiscritti o soppressi non vengono riattivati.
