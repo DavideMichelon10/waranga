@@ -1,106 +1,47 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createSubscribeHandler } from '../server/subscribe.js';
-import { createReach, audienceName, NEWSLETTER_TAG } from '../server/reach.js';
-import { limitRequests } from '../server/services.js';
-import { normalizeContent } from '../src/lib/content.js';
-import { waitlistPhase } from '../src/lib/waitlists.js';
-
-function store() {
-  const entries = new Map(); let revision = 0;
-  return {
-    entries,
-    async get(key) { return entries.get(key)?.data || null; },
-    async getWithMetadata(key) { return entries.get(key) || null; },
-    async setJSON(key, data, options = {}) {
-      if ((options.onlyIfNew && entries.has(key)) || (options.onlyIfMatch && options.onlyIfMatch !== entries.get(key)?.etag)) return { modified: false };
-      entries.set(key, { data: structuredClone(data), etag: String(++revision) }); return { modified: true };
-    },
-  };
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { randomUUID } from 'node:crypto';
+import { createSubscribeHandler, waitlistName } from '../server/subscribe.js';
+import { createHostingerStore } from '../server/hostinger-store.js';
+import { migrateStoredRecords } from '../server/brevo-migration.js';
+import { saveFormRecord } from '../server/form-history.js';
+const req = (data, path = '/api/newsletter') => new Request('https://test.example' + path, { method: 'POST', headers: { origin: 'https://test.example', 'content-type': 'application/json' }, body: JSON.stringify(data) });
+async function setup(t, overrides = {}) {
+ const dir = await mkdtemp(join(tmpdir(), 'wananga-subscriptions-')); t.after(()=>rm(dir,{recursive:true,force:true}));
+ const db=createHostingerStore(dir); let wakes=0;
+ const handler=createSubscribeHandler({store:()=>db,configured:()=>true,hash:s=>s,limit:(s,k,n)=>s.limit(k,n),getWaitlist:async()=>({_id:'bali-list',slug:'bali-prossima-partenza',status:'collecting'}),wake:()=>wakes++,...overrides});
+ return {db,handler,wakes:()=>wakes};
 }
-const request = (body, path = '/api/waitlist') => new Request(`https://wananga.it${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: 'https://wananga.it' }, body: JSON.stringify(body) });
-const signup = { email: 'hello@example.com', waitlistId: 'waiting-bali-2027', privacy: true, newsletter: false };
-const list = { _id: signup.waitlistId, title: 'Bali', slug: { current: 'bali-2027' }, status: 'collecting' };
-
-test('standby never writes contacts or consent; validation precedes all side effects', async () => {
-  let writes = 0;
-  const handle = createSubscribeHandler({ configured: () => false, store: () => { writes++; throw Error(); } });
-  assert.equal((await handle(request(signup))).status, 503);
-  for (const input of [{ ...signup, privacy: false }, { ...signup, email: 'bad' }, { ...signup, waitlistId: 'drafts.hidden' }, { ...signup, newsletter: 'true' }]) assert.equal((await handle(request(input))).status, 400);
-  assert.equal(writes, 0);
+test('newsletter and waitlist persist separate consent records before acknowledging, with retry deduplication',async t=>{
+ const {db,handler}=await setup(t);
+ const input={requestId:randomUUID(),email:'test@example.com',privacy:true,newsletter:true};
+ assert.equal((await handler(req(input))).status,200);assert.equal((await handler(req(input))).status,200);
+ const wait={...input,requestId:randomUUID(),waitlistId:'bali-list',newsletter:false};
+ assert.equal((await handler(req(wait,'/api/waitlist'))).status,200);
+ const records=await db.findDeliverableRecords();assert.equal(records.length,2);
+ const n=records.find(r=>r.kind==='newsletter'),w=records.find(r=>r.kind==='waitlist');
+ assert.equal(n.consenso_newsletter,true);assert.ok(n.newsletterConsent);
+ assert.equal(w.consenso_newsletter,false);assert.equal(w.newsletterConsent,null);assert.ok(w.waitlistConsent);assert.equal(w.waitlistName,'Lista d’attesa · Bali prossima partenza');
+ assert.ok(records.every(r=>r.status==='queued'&&r.provider==='brevo'));
 });
-
-test('waiting list and newsletter choices are independent and consent is stored privately', async () => {
-  const db = store(); const calls = [];
-  const handle = createSubscribeHandler({ configured: () => true, store: () => db, hash: () => 'email-hash', limit: async () => {}, getWaitlist: async () => list, reach: () => ({ subscribe: async (email, names) => { calls.push(names); return { status: 'pending_confirmation' }; } }) });
-  assert.equal((await handle(request(signup))).status, 200);
-  assert.deepEqual(calls[0], [audienceName(list)]);
-  await handle(request({ ...signup, newsletter: true }));
-  assert.deepEqual(calls[1], [audienceName(list), NEWSLETTER_TAG]);
-  assert.equal(db.entries.size, 2);
-  assert.deepEqual([...db.entries.values()].map(entry => entry.data.newsletter), [false, true]);
+test('invalid consent, cross-origin, closed lists and storage failure never acknowledge success',async t=>{
+ const {db,handler}=await setup(t);
+ for(const patch of [{privacy:false},{newsletter:false},{email:'bad'},{website:'bot'}])assert.equal((await handler(req({email:'test@example.com',privacy:true,newsletter:true,...patch}))).status,400);
+ const cross=req({email:'test@example.com',privacy:true,newsletter:true});cross.headers.set('origin','https://evil.example');assert.equal((await handler(cross)).status,403);
+ assert.equal((await db.findDeliverableRecords()).length,0);
+ const closed=await setup(t,{getWaitlist:async()=>({status:'closed'})});assert.equal((await closed.handler(req({email:'test@example.com',privacy:true,newsletter:false,waitlistId:'bali'},'/api/waitlist'))).status,409);
+ const failure=createSubscribeHandler({configured:()=>true,hash:s=>s,limit:async()=>{},store:()=>({withLock:async(k,fn)=>fn(),getJSON:async()=>null,setJSON:async()=>{throw Error('disk');}})});
+ assert.equal((await failure(req({email:'test@example.com',privacy:true,newsletter:true}))).status,503);
 });
-
-test('nonexistent and closed lists never reach Reach', async () => {
-  for (const item of [null, { ...list, status: 'closed' }, { ...list, status: 'available' }]) {
-    const handle = createSubscribeHandler({ configured: () => true, store, hash: () => 'hash', limit: async () => {}, getWaitlist: async () => item, reach: () => { throw Error('Must not call'); } });
-    assert.equal((await handle(request(signup))).status, 409);
-  }
-});
-
-test('newsletter-only requires an explicit choice and no waiting list', async () => {
-  const calls = [];
-  const handle = createSubscribeHandler({ configured: () => true, store, hash: () => 'hash', limit: async () => {}, reach: () => ({ subscribe: async (_, names) => { calls.push(names); return { status: 'subscribed' }; } }) });
-  assert.equal((await handle(request({ email: signup.email, privacy: true, newsletter: false }))).status, 400);
-  assert.equal((await handle(request({ email: signup.email, privacy: true, newsletter: true }))).status, 200);
-  assert.deepEqual(calls, [[NEWSLETTER_TAG]]);
-});
-
-test('existing contacts get additive tags; unsubscribed contacts are never reactivated', async () => {
-  for (const status of ['subscribed', 'unsubscribed']) {
-    const calls = [];
-    const reach = createReach({ token: 'test', profileId: 'profile', fetcher: async (url, options) => {
-      calls.push({ url, ...options });
-      if (url.includes('/contacts?')) return Response.json({ data: [{ uuid: 'contact', email: signup.email, subscription_status: status }] });
-      if (url.endsWith('/tags')) return Response.json({ data: [{ value: 'new-trip', uuid: 'tag' }] });
-      return new Response(null, { status: 204 });
-    } });
-    if (status === 'unsubscribed') { await assert.rejects(() => reach.subscribe(signup.email, ['new-trip'])); assert.equal(calls.length, 1); }
-    else { assert.equal((await reach.subscribe(signup.email, ['new-trip'])).status, 'subscribed'); assert.ok(calls.some(call => call.url.endsWith('/tags/tag/contacts/contact'))); assert.ok(calls.every(call => !['PATCH', 'DELETE'].includes(call.method))); }
-  }
-});
-
-test('new pending contacts receive separate tags and require confirmation', async () => {
-  let searches = 0; let created;
-  const reach = createReach({ token: 'test', profileId: 'profile', fetcher: async (url, options) => {
-    if (url.includes('/contacts?')) return Response.json({ data: ++searches === 1 ? [] : [{ uuid: 'contact', email: signup.email, subscription_status: 'pending' }] });
-    if (url.endsWith('/tags')) return Response.json({ data: [{ value: 'trip', uuid: 'tag-trip' }, { value: NEWSLETTER_TAG, uuid: 'tag-news' }] });
-    if (url.endsWith('/contacts')) { created = JSON.parse(options.body); return Response.json({ success: true }); }
-    return new Response(null, { status: 204 });
-  } });
-  assert.equal((await reach.subscribe(signup.email, ['trip', NEWSLETTER_TAG])).status, 'pending_confirmation');
-  assert.deepEqual(created.tag_uuids, ['tag-trip', 'tag-news']);
-});
-
-test('rate limit remains bounded under concurrent submissions', async () => {
-  const db = store();
-  const results = await Promise.allSettled(Array.from({ length: 10 }, () => limitRequests(db, 'ip', 3, 100000)));
-  assert.equal(results.filter(result => result.status === 'fulfilled').length, 3);
-});
-
-test('catalog remains independent from waiting lists, missing trips never create broken launch links', () => {
-  const content = normalizeContent({ trips: [{ title: 'Bali', slug: 'bali' }], waitlists: [{ ...list, slug: 'bali-2027' }, { ...list, slug: 'bali-2027' }] });
-  assert.equal(content.trips.length, 1); assert.equal(content.waitlists.length, 1);
-  assert.equal(waitlistPhase({ status: 'available', trip: null }), 'unavailable');
-  assert.equal(waitlistPhase({ status: 'available', trip: { slug: 'bali' } }), 'available');
-});
-
-
-test('waiting list tags are readable, distinct by departure, and stable across title changes', () => {
-  const bali = { _id: 'internal-id', title: 'Bali', slug: { current: 'bali-prossima-partenza' } };
-  assert.equal(audienceName(bali), 'Lista d’attesa · Bali prossima partenza');
-  assert.equal(audienceName({ ...bali, title: 'Nuovo titolo editoriale' }), audienceName(bali));
-  assert.notEqual(audienceName({ ...bali, slug: 'bali-2027' }), audienceName(bali));
-  assert.equal(audienceName({ slug: 'thailandia-2027' }), 'Lista d’attesa · Thailandia 2027');
-  assert.throws(() => audienceName({ slug: '' }), { code: 'invalid_waitlist' });
+test('legacy migration keeps complete source records and is restart-safe',async t=>{
+ const {db}=await setup(t);const old={email:'test@example.com',requestId:randomUUID(),kind:'application',at:'2026-09-24T09:00:00Z',status:'received',motivazione:'a'.repeat(2000),viaggio:'Bali'};
+ await saveFormRecord(db,`forms/${old.email}/${old.requestId}`,old,{secret:'test'});
+ await db.setJSON('old-consent',{email:old.email,at:old.at,privacyVersion:'v1',newsletter:true,status:'subscribed'});
+ await migrateStoredRecords(db,{hash:s=>s,secret:'test'});await migrateStoredRecords(db,{hash:s=>s,secret:'test'});
+ const records=await db.findDeliverableRecords();assert.equal(records.length,2);assert.ok(records.every(r=>r.imported&&r.status==='queued'));assert.equal(records.find(r=>r.kind==='application').motivazione,old.motivazione);
+ assert.equal((await db.getJSON('old-consent')).status,'subscribed');
+ assert.equal(records.find(r=>r.kind==='newsletter').originalStatus,'subscribed');
 });

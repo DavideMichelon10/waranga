@@ -38,7 +38,7 @@ export default function NewsletterForm({ copy }) {
   }[status];
 
   return (
-    <div className="reach-newsletter">
+    <div className="newsletter-form">
       <form className="wa-form newsletter-form" onSubmit={submit} aria-busy={status === "sending"}>
         <label htmlFor={`${id}-email`}>
           {copy.newsletterEmailLabel}

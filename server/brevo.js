@@ -80,11 +80,11 @@ export function createBrevoClient({ api = createBrevoApi(), pipelineId = process
   async function ensureList(name) {
     if (lists.has(name)) return lists.get(name);
     if (!folderId) {
-      const folder = await findPaged('/contacts/folders', d => d.folders, f => f.name === 'Wānanga');
+      const folder = await findPaged('/contacts/folders', d => d.folders || [], f => f.name === 'Wānanga');
       folderId = folder?.id || (await api('/contacts/folders', 'POST', { name: 'Wānanga' })).id;
       if (!folderId) throw new BrevoError('brevo_missing_folder');
     }
-    const existing = await findPaged(`/contacts/folders/${folderId}/lists`, d => d.lists, l => l.name === name);
+    const existing = await findPaged(`/contacts/folders/${folderId}/lists`, d => d.lists || [], l => l.name === name);
     const id = existing?.id || (await api('/contacts/lists', 'POST', { name, folderId })).id;
     if (!id) throw new BrevoError('brevo_missing_list');
     lists.set(name, id); return id;

@@ -4,23 +4,29 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { createBrevoApi, createBrevoTrialClient, BrevoError, submissionNote, submissionReference, trialAttributes, trialEligible } from '../server/brevo.js';
+import { createBrevoApi, createBrevoClient, BrevoError, submissionNote, submissionReference, dealAttributes } from '../server/brevo.js';
 import { createBrevoDelivery } from '../server/brevo-delivery.js';
 import { createHostingerStore } from '../server/hostinger-store.js';
 import { createFormHandler } from '../server/forms.js';
 
-const record = overrides => ({ requestId: randomUUID(), email: 'test@example.com', nome: 'Test', kind: 'application', tripSlug: 'bali', viaggio: 'Bali', at: '2026-09-24T10:00:00Z', status: 'queued', privacy_accepted: true, consenso_newsletter: false, motivazione: 'Motivazione completa', brevoTrial: true, ...overrides });
+const record = overrides => ({ requestId: randomUUID(), email: 'test@example.com', nome: 'Test', kind: 'application', tripSlug: 'bali', viaggio: 'Bali', at: '2026-09-24T10:00:00Z', status: 'queued', privacy_accepted: true, consenso_newsletter: false, motivazione: 'Motivazione completa', provider: 'brevo', ...overrides });
 function remote() {
-  const contacts = [], deals = [], notes = [], calls = [];
+  const contacts = [], deals = [], notes = [], calls = [], lists = [];
   let loseDealReply = false, hideDeal = false, loseNoteReply = false;
   async function api(path, method = 'GET', body) {
     calls.push({ path, method, body });
     const url = new URL(path, 'https://test.example');
+    if (url.pathname === '/contacts/folders') return { folders: [{ id: 1, name: 'Wānanga' }] };
+    if (url.pathname === '/contacts/folders/1/lists') return { lists };
+    if (path === '/contacts/lists' && method === 'POST') { const l = { ...body, id: lists.length + 1 }; lists.push(l); return l; }
+    if (/^\/contacts\/lists\/\d+\/contacts\/add$/.test(url.pathname)) {
+      for (const id of body.ids) { const c = contacts.find(c => c.id === id); c.listIds = [...new Set([...(c.listIds || []), Number(path.split('/')[3])])]; } return {};
+    }
     if (path === '/contacts/attributes') return { attributes: [{ name: 'NOME', field_key: 'firstname' }] };
     if (path === '/crm/pipeline/details/all') return [{ pipeline: 'p', stages: [{ id: 's', name: 'New' }] }];
-    if (path === '/crm/attributes/deals') return Object.entries(trialAttributes).map(([internalName, label]) => ({ internalName, label, attributeTypeName: 'text' }));
+    if (path === '/crm/attributes/deals') return Object.entries(dealAttributes).map(([internalName, label]) => ({ internalName, label, attributeTypeName: 'text' }));
     if (path.startsWith('/contacts/') && method === 'GET') {
-      const c = contacts.find(c => c.email === decodeURIComponent(path.split('/').at(-1)));
+      const c = contacts.find(c => c.email === decodeURIComponent(path.split('/').at(-1)) || String(c.id) === path.split('/').at(-1));
       if (!c) throw new BrevoError('brevo_http_404', 404);
       return c;
     }
@@ -29,14 +35,14 @@ function remote() {
     }
     if (url.pathname === '/crm/deals' && method === 'GET') {
       const contactId = Number(url.searchParams.get('filters[linkedContactsIds]'));
-      return { items: hideDeal ? [] : deals.filter(d => d.linkedContactsIds.includes(contactId)) };
+      return { items: hideDeal ? [] : deals.filter(d => !contactId || d.linkedContactsIds.includes(contactId)) };
     }
     if (path === '/crm/deals' && method === 'POST') {
       const d = { ...body, id: 'd' + deals.length }; deals.push(d);
       if (loseDealReply) throw new BrevoError('brevo_network_error');
       return d;
     }
-    if (url.pathname === '/crm/notes' && method === 'GET') return notes.filter(n => n.dealIds.includes(url.searchParams.get('entityIds')));
+    if (url.pathname === '/crm/notes' && method === 'GET') return notes.filter(n => url.searchParams.get('entity') === 'contacts' ? n.contactIds.includes(Number(url.searchParams.get('entityIds'))) : n.dealIds?.includes(url.searchParams.get('entityIds')));
     if (path === '/crm/notes' && method === 'POST') {
       const n = { ...body, id: 'n' + notes.length }; notes.push(n);
       if (loseNoteReply) throw new BrevoError('brevo_network_error');
@@ -52,7 +58,7 @@ async function fixture(t) {
   return createHostingerStore(dir);
 }
 test('two applications and a contact message remain separate on one person with full escaped text', async () => {
-  const r = remote(), client = createBrevoTrialClient({ api: r.api });
+  const r = remote(), client = createBrevoClient({ api: r.api });
   const first = record({ motivazione: '<script>alert(1)</script>' + 'a'.repeat(1950) });
   const second = record({ viaggio: 'Thailandia', info_utili: 'b'.repeat(1900) });
   for (const item of [first, second, record({ kind: 'contact', messaggio: 'c'.repeat(5000), viaggio: undefined })]) await client.submit(item, {}, async () => {});
@@ -68,62 +74,46 @@ test('two applications and a contact message remain separate on one person with 
 test('existing marketing suppression is not changed even when a form requests newsletter', async () => {
   for (const emailBlacklisted of [false, true]) {
     const r = remote(); r.contacts.push({ id: 8, email: 'test@example.com', emailBlacklisted });
-    await createBrevoTrialClient({ api: r.api }).submit(record({ consenso_newsletter: true }), {}, async () => {});
+    await createBrevoClient({ api: r.api }).submit(record({ consenso_newsletter: true }), {}, async () => {});
     assert.equal(r.contacts[0].emailBlacklisted, emailBlacklisted);
-    assert.ok(!r.calls.some(c => c.path.startsWith('/contacts') && c.method !== 'GET'));
+    assert.ok(!r.calls.some(c => /^\/contacts(?:\/\d+)?$/.test(c.path) && c.method !== 'GET'));
   }
 });
 test('lost deal response is recovered after restart without a second deal', async () => {
   const r = remote(); r.loseDeal(); let receipt = {}; const item = record();
   const checkpoint = async state => { receipt = state; };
-  await assert.rejects(createBrevoTrialClient({ api: r.api }).submit(item, receipt, checkpoint), { code: 'brevo_network_error' });
+  await assert.rejects(createBrevoClient({ api: r.api }).submit(item, receipt, checkpoint), { code: 'brevo_network_error' });
   assert.equal(receipt.dealIntent, true);
-  await createBrevoTrialClient({ api: r.api }).submit(item, receipt, checkpoint);
+  await createBrevoClient({ api: r.api }).submit(item, receipt, checkpoint);
   assert.equal(r.deals.length, 1); assert.equal(r.notes.length, 1);
-  await createBrevoTrialClient({ api: r.api }).submit(item, receipt, checkpoint);
+  await createBrevoClient({ api: r.api }).submit(item, receipt, checkpoint);
   assert.equal(r.deals.length, 1); assert.equal(r.notes.length, 1);
 });
 test('ambiguous create never retries a POST when reconciliation cannot find the remote deal', async () => {
   const r = remote(); r.loseDeal(); let receipt = {}; const item = record();
   const checkpoint = async state => { receipt = state; };
-  await assert.rejects(createBrevoTrialClient({ api: r.api }).submit(item, receipt, checkpoint)); r.hideDeal();
-  await assert.rejects(createBrevoTrialClient({ api: r.api }).submit(item, receipt, checkpoint), { code: 'brevo_deal_reconcile_required' });
+  await assert.rejects(createBrevoClient({ api: r.api }).submit(item, receipt, checkpoint)); r.hideDeal();
+  await assert.rejects(createBrevoClient({ api: r.api }).submit(item, receipt, checkpoint), { code: 'brevo_deal_reconcile_required' });
   assert.equal(r.deals.length, 1);
 });
 test('lost note response is reconciled without duplicating answers', async () => {
   const r = remote(); r.loseNote(); let receipt = {}; const item = record();
   const checkpoint = async state => { receipt = state; };
-  await assert.rejects(createBrevoTrialClient({ api: r.api }).submit(item, receipt, checkpoint));
-  await createBrevoTrialClient({ api: r.api }).submit(item, receipt, checkpoint);
+  await assert.rejects(createBrevoClient({ api: r.api }).submit(item, receipt, checkpoint));
+  await createBrevoClient({ api: r.api }).submit(item, receipt, checkpoint);
   assert.equal(r.notes.length, 1);
-});
-test('trial is disabled by default and requires an exact allowed email', () => {
-  assert.equal(trialEligible('test@example.com', {}), false);
-  const env = { BREVO_TRIAL_ENABLED: 'true', BREVO_API_KEY: 'test', BREVO_TRIAL_EMAILS: ' Test@example.com ' };
-  assert.equal(trialEligible('test@example.com', env), true);
-  assert.equal(trialEligible('test+alias@example.com', env), false);
 });
 test('Brevo retry receipts survive restart and cannot alter Reach form status or import older forms', async t => {
   const db = await fixture(t); const r = remote(); let now = 1000; let offline = true;
-  const item = record({ status: 'received' });
-  await db.setJSON('form1', item); await db.setJSON('old', record({ brevoTrial: undefined })); await db.setJSON('other', record({ email: 'other@example.com' }));
-  const client = createBrevoTrialClient({ api: (...args) => { if (offline) throw new BrevoError('brevo_http_503', 503); return r.api(...args); } });
-  const opts = { store: () => db, eligible: email => email === item.email, client, now: () => now };
+  const item = record();
+  const formKey = `forms/${item.email}/${item.requestId}`; await db.setJSON(formKey, item); await db.setJSON('old', record({ provider: undefined }));
+  const client = createBrevoClient({ api: (...args) => { if (offline) throw new BrevoError('brevo_http_503', 503); return r.api(...args); } });
+  const opts = { store: () => db, hash: s => s, historySecret: 'test', client, now: () => now };
   await createBrevoDelivery(opts).kick(); offline = false;
   await createBrevoDelivery(opts).kick(); assert.equal(r.deals.length, 0);
   now += 5000; await createBrevoDelivery(opts).kick(); await createBrevoDelivery(opts).kick();
-  assert.equal(r.deals.length, 1); assert.equal((await db.getJSON('form1')).status, 'received');
-  assert.equal((await db.getJSON('brevo-trial/' + submissionReference(item))).status, 'received');
-});
-test('only server eligibility can enroll a form in the trial', async t => {
-  const db = await fixture(t);
-  const handler = createFormHandler({ store: () => db, hash: s => s, historySecret: 'test', enabled: () => true, brevoEligible: email => email === 'allowed@example.com' });
-  for (const email of ['allowed@example.com', 'other@example.com']) {
-    const input = record({ email, kind: 'contact', messaggio: 'Message', brevoTrial: true });
-    const result = await handler(new Request('https://test.example/api/contact', { method: 'POST', headers: { origin: 'https://test.example', 'content-type': 'application/json' }, body: JSON.stringify(input) }));
-    assert.equal(result.status, 200);
-    assert.equal((await db.findForms(email))[0].brevoTrial === true, email === 'allowed@example.com');
-  }
+  assert.equal(r.deals.length, 1); assert.equal((await db.getJSON(formKey)).status, 'received');
+  assert.equal((await db.getJSON('brevo-delivery/' + submissionReference(item))).status, 'received');
 });
 test('API refuses redirects and redacts remote error bodies', async () => {
   const api = createBrevoApi({ token: 'private-test', fetcher: async (url, options) => {
@@ -137,4 +127,13 @@ test('unauthorized IPv4 and IPv6 are exposed without logging the rest of the res
     const api = createBrevoApi({ token: 'test', fetcher: async () => Response.json({ message: `Unrecognised IP address ${ip}. Secret body must not be logged.` }, { status: 401 }) });
     await assert.rejects(api('/account'), e => e.unauthorizedIp === ip && e.message === 'brevo_http_401');
   }
+});
+test('newsletter and waitlist create distinct consent notes and lists without consuming deals', async () => {
+ const r=remote(),client=createBrevoClient({api:r.api});
+ await client.submit(record({kind:'newsletter',consenso_newsletter:true}),{},async()=>{});
+ await client.submit(record({kind:'waitlist',waitlistName:'Lista d’attesa · Bali',consenso_newsletter:false}),{},async()=>{});
+ assert.equal(r.deals.length,0);assert.equal(r.notes.length,2);assert.equal(r.contacts.length,1);
+ assert.equal(r.contacts[0].emailBlacklisted,false);
+ const names=r.calls.filter(c=>c.path==='/contacts/lists'&&c.method==='POST').map(c=>c.body.name);
+ assert.deepEqual(names,['Newsletter','Lista d’attesa · Bali']);
 });

@@ -9,7 +9,7 @@ export function localApi() {
         const path = req.url?.split('?')[0];
         if (!['/api/waitlist', '/api/newsletter', '/api/contact', '/api/application'].includes(path)) return next();
         // Development never silently writes real contacts with production credentials.
-        if (['/api/contact', '/api/application'].includes(path)) {
+        if (['/api/contact', '/api/application', '/api/newsletter', '/api/waitlist'].includes(path)) {
           res.statusCode = 503; res.setHeader('Content-Type', 'application/json');
           res.end(JSON.stringify({ error: 'not_configured' })); return;
         }

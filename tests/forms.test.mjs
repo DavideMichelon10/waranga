@@ -4,11 +4,9 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { createFormDelivery } from '../server/form-delivery.js';
+import { createBrevoDelivery } from '../server/brevo-delivery.js';
 import { createFormHandler } from '../server/forms.js';
 import { createHostingerStore } from '../server/hostinger-store.js';
-import { createReach } from '../server/reach.js';
-import fields from '../server/reach-fields.json' with { type: 'json' };
 import { tripRequestPath } from '../src/lib/content.js';
 const input = () => ({ requestId: randomUUID(), nome: 'Test Wānanga', email: 'test@example.com', privacy_accepted: true, consenso_newsletter: false, messaggio: 'Una domanda sul viaggio.' });
 const application = () => ({ ...input(), tripSlug: 'bali', telefono: '+39 333 1234567', eta: '30', numero_persone: '2', contatto_preferito: 'sera', motivazione: 'Vorrei scoprire Bali.', esperienza_gruppo: 'No', info_utili: '' });
@@ -28,7 +26,7 @@ test('invalid forms, cross-origin submissions and closed trips never enter the d
   assert.equal((await handler(request(application(),'/api/application'))).status,409);
   assert.equal((await db.findForms()).length,0);
 });
-test('a confirmed request is durably queued once before Reach responds, including after a restart', async t => {
+test('a confirmed request is durably queued once before Brevo responds, including after a restart', async t => {
   const { db, directory } = await fixture(t); let calls = 0; let finish;
   const handler = createFormHandler({ historySecret: 'unit-test-history-secret', store: () => db, enabled: () => true, hash: s => s });
   const data = input();
@@ -38,14 +36,14 @@ test('a confirmed request is durably queued once before Reach responds, includin
   assert.equal(saved.length, 1); assert.equal(saved[0].status, 'queued');
   assert.equal(saved[0].messaggio, data.messaggio);
   const afterRestart = createHostingerStore(directory);
-  const delivery = createFormDelivery({ origin: 'https://test.example', historySecret: 'unit-test-history-secret', store: () => afterRestart, hash: s => s,
-    reach: () => ({ submitForm: async () => { calls++; return new Promise(resolve => { finish = resolve; }); } }),
+  const delivery = createBrevoDelivery({ origin: 'https://test.example', historySecret: 'unit-test-history-secret', store: () => afterRestart, hash: s => s,
+    client: { submit: async () => { calls++; return new Promise(resolve => { finish = resolve; }); } },
   });
   const pending = delivery.kick();
   while (!finish) await new Promise(resolve => setImmediate(resolve));
   // The next visitor can submit while a slow provider is still processing this email.
   assert.equal((await handler(request({ ...data, requestId: randomUUID(), messaggio: 'Second request' }))).status, 200);
-  finish({ contactUuid: 'c', newsletter: 'not_requested' }); await pending;
+  finish({ contactId: 1, noteId: 'n', dealId: 'd' }); await pending;
   assert.equal(calls, 1);
   assert.equal((await handler(request(data))).status, 200);
   assert.equal((await db.findForms(data.email)).find(row => row.requestId === data.requestId).status, 'received');
@@ -65,73 +63,7 @@ test('concurrent submissions for one email are serialized and lock releases afte
   await assert.rejects(db.withLock('email',async()=>{throw Error('failure');}));
   await db.withLock('email',async()=>{});
 });
-function provider({existing=true,status='subscribed',activeAutomation=false}={}){
- let contact=existing?{uuid:'c',email:'test@example.com',subscription_status:status,note:'Existing member'}:null;
- const calls=[];
- const reach=createReach({token:'test',profileId:'profile',fetcher:async(url,options)=>{
-  const body=options.body?JSON.parse(options.body):null;calls.push({url,method:options.method,body});
-  if(url.includes('/contacts?'))return Response.json({data:contact?[contact]:[]});
-  if(url.includes('/automations?'))return Response.json({data:activeAutomation?[{status:'active'}]:[]});
-  if(url.endsWith('/contacts')&&options.method==='POST'){contact={...body,uuid:'c',subscription_status:'subscribed'};return Response.json({success:true});}
-  if(url.endsWith('/contacts/c')&&options.method==='GET')return Response.json({...contact,fields:[{uuid:'unrelated',type:'text',value:'preserve me'}]});
-  if(url.endsWith('/contacts/c')&&options.method==='PATCH'){Object.assign(contact,body);return Response.json({success:true});}
-  if(url.endsWith('/tags'))return Response.json({data:body.names.map(value=>({uuid:value,value}))});
-  return new Response(null,{status:204});
- }});return {reach,calls};
-}
-test('Reach shows readable previews and a private history link while preserving unrelated fields and subscriptions',async()=>{
- const {reach,calls}=provider();const data={...input(),kind:'contact',at:new Date().toISOString(),messaggio:'à'.repeat(5000),historyUrl:'https://test.example/richieste/'+'a'.repeat(64)};
- const result=await reach.submitForm(data);assert.equal(result.newsletter,'not_requested');
- const patch=calls.find(c=>c.method==='PATCH').body;
- assert.equal(patch.subscription_status,undefined);
- assert.equal(patch.fields.find(f=>f.uuid==='unrelated').value,'preserve me');
- assert.match(patch.fields.find(f=>f.uuid===fields.message).value,/testo completo/);
- assert.equal(patch.fields.find(f=>f.uuid===fields.history_url).value,data.historyUrl);
- assert.ok(patch.fields.every(f=>f.value===null||Array.from(f.value).length<=255));
- assert.ok(!calls.some(c=>c.url.includes('/tags/wananga-newsletter/')));
-});
-test('new operational contacts are unsubscribed; existing suppressed contacts are never revived',async()=>{
- for(const existing of [false,true]){
-  const {reach,calls}=provider({existing,status:'unsubscribed'});
-  const data={...input(),kind:'contact',at:new Date().toISOString(),consenso_newsletter:existing};
-  const result=await reach.submitForm(data);
-  const patch=calls.find(c=>c.method==='PATCH').body;
-  assert.equal(patch.subscription_status,existing?undefined:'unsubscribed');
-  assert.equal(result.newsletter,existing?'not_subscribed':'not_requested');
-  assert.ok(!calls.some(c=>c.url.includes('/tags/wananga-newsletter/')));
- }
- const {reach,calls}=provider({existing:false,activeAutomation:true});
- await assert.rejects(reach.submitForm({...input(),kind:'contact',at:new Date().toISOString()}),{code:'operational_contact_automation'});
- assert.ok(!calls.some(c=>c.method==='POST'));
-});
-test('application data maps to Reach and opt-in adds only the newsletter tag when requested',async()=>{
- const {reach,calls}=provider();
- const result=await reach.submitForm({...application(),kind:'application',viaggio:'Bali',at:new Date().toISOString(),consenso_newsletter:true});
- assert.equal(result.newsletter,'subscribed');
- const patch=calls.find(c=>c.method==='PATCH').body;
- assert.equal(patch.phone,'+393331234567');
- assert.equal(patch.fields.find(f=>f.uuid===fields.age).value,'30');
- assert.ok(calls.some(c=>c.url.includes('/tags/wananga-candidature/')));
- assert.ok(calls.some(c=>c.url.includes('/tags/wananga-newsletter/')));
- assert.equal(tripRequestPath({slug:'thailandia'}),'/candidatura/thailandia');
-});
-
-test('new Reach contacts can become queryable after the create acknowledgement', async () => {
-  let searches = 0; let patches = 0; const delays = [];
-  const reach = createReach({ token: 'test', profileId: 'p', pause: async ms => delays.push(ms), fetcher: async (url, options) => {
-    if (url.includes('/contacts?')) return Response.json({ data: ++searches < 3 ? [] : [{ uuid: 'new', email: 'test@example.com', subscription_status: 'subscribed', note: 'wananga-contact-only' }] });
-    if (url.includes('/automations?')) return Response.json({ data: [] });
-    if (url.endsWith('/contacts/new') && options.method === 'GET') return Response.json({ fields: [] });
-    if (url.endsWith('/contacts/new') && options.method === 'PATCH') { patches++; return Response.json({ success: true }); }
-    if (url.endsWith('/tags')) return Response.json({ data: JSON.parse(options.body).names.map(value => ({ uuid: value, value })) });
-    return Response.json({ message: 'Request accepted' });
-  } });
-  const result = await reach.submitForm({ ...input(), kind: 'contact', at: new Date().toISOString() });
-  assert.equal(result.contactUuid, 'new'); assert.equal(patches, 1); assert.deepEqual(delays, [500]);
-});
-
-
-test('forms from tabs opened before the Reach migration use the same validated delivery and storage', async t => {
+test('forms from tabs opened before the Brevo migration use the same validated delivery and storage', async t => {
   const { db } = await fixture(t); const delivered = [];
   const handler = createFormHandler({ historySecret: 'test-secret', store: () => db, enabled: () => true, hash: s => s,
     getTrip: async slug => slug === 'bali' ? { title: 'Bali', status: 'interest' } : null,
@@ -146,7 +78,7 @@ test('forms from tabs opened before the Reach migration use the same validated d
   const applicationPath = '/hcgi/platform/api/collections/candidature/records';
   assert.equal((await handler(request({ ...oldApplication, info_utili: 'Età: 0 anni' }, applicationPath))).status, 400);
   assert.equal((await handler(request(oldApplication, applicationPath))).status, 200);
-  await createFormDelivery({ origin: 'https://test.example', historySecret: 'test-secret', store: () => db, hash: s => s, reach: () => ({ submitForm: async data => { delivered.push(data); return { contactUuid: 'c', newsletter: 'not_requested' }; } }) }).kick();
+  await createBrevoDelivery({ origin: 'https://test.example', historySecret: 'test-secret', store: () => db, hash: s => s, client: { submit: async data => { delivered.push(data); return { contactId: 1, noteId: 'n', dealId: 'd' }; } } }).kick();
   assert.equal(delivered.length, 2);
   assert.equal(delivered[0].kind, 'contact');
   assert.equal(delivered[0].messaggio, contact.messaggio);
@@ -155,41 +87,4 @@ test('forms from tabs opened before the Reach migration use the same validated d
   assert.equal(delivered[1].info_utili, 'Preferisco la sera.');
   assert.equal(delivered[1].tripSlug, 'bali');
   assert.equal((await db.findForms(contact.email)).length, 2);
-});
-
-
-test('existing tagged contacts need only lookup, details and one update', async () => {
-  const calls = [];
-  const reach = createReach({ token: 'test', profileId: 'p', fetcher: async (url, options) => {
-    calls.push({ url, method: options.method });
-    if (url.includes('/contacts?')) return Response.json({ data: [{ uuid: 'c', email: 'test@example.com', subscription_status: 'subscribed' }] });
-    if (options.method === 'GET') return Response.json({ fields: [], tags: ['wananga-candidature', 'wananga-viaggio-bali', 'wananga-newsletter'].map(value => ({ value })) });
-    return Response.json({ success: true });
-  } });
-  const result = await reach.submitForm({ ...application(), kind: 'application', viaggio: 'Bali', at: new Date().toISOString(), consenso_newsletter: true });
-  assert.equal(result.newsletter, 'subscribed');
-  assert.deepEqual(calls.map(call => call.method), ['GET', 'GET', 'PATCH']);
-});
-
-
-test('contact updates preserve the last application and maintain separate dates and counts', async () => {
-  let patch;
-  const reach = createReach({ token: 'test', profileId: 'profile', fetcher: async (url, options) => {
-    if (url.includes('/contacts?')) return Response.json({ data: [{ uuid: 'c', email: 'test@example.com', subscription_status: 'subscribed' }] });
-    if (options.method === 'GET') return Response.json({ fields: [
-      { uuid: fields.trip, type: 'text', value: 'Bali' },
-      { uuid: fields.motivation, type: 'text', value: 'Previous application answer' },
-      { uuid: fields.application_at, type: 'text', value: '23/09/26, 12:00' },
-    ], tags: [{ value: 'wananga-contatti' }] });
-    patch = JSON.parse(options.body); return Response.json({ success: true });
-  } });
-  await reach.submitForm({ ...input(), kind: 'contact', at: '2026-09-24T10:00:00Z', overview: { application_count: '2', contact_count: '1', application_summary: 'Bali: 2', application_at: '23/09/26, 12:00' } });
-  const value = key => patch.fields.find(field => field.uuid === fields[key]).value;
-  assert.equal(value('trip'), 'Bali');
-  assert.equal(value('motivation'), 'Previous application answer');
-  assert.equal(value('application_at'), '23/09/26, 12:00');
-  assert.equal(value('contact_at'), '24/09/26, 12:00');
-  assert.equal(value('application_count'), '2');
-  assert.equal(value('contact_count'), '1');
-  assert.equal(patch.subscription_status, undefined);
 });

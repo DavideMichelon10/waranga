@@ -5,7 +5,7 @@ import { waitlistName } from './subscribe.js';
 import { migrateStoredRecords } from './brevo-migration.js';
 
 export function createBrevoDelivery({ store, client = createBrevoClient(), hash = privateKey, historySecret = process.env.CONSENT_HASH_SECRET, now = Date.now, migrate = process.env.BREVO_MIGRATE_LEGACY === 'true', waitlist = getWaitlist }) {
-  let running, timer;
+  let running, timer, lastSummary;
   async function deliver() {
     const db = store();
     await db.withLock('brevo-delivery', async () => {
@@ -38,6 +38,9 @@ export function createBrevoDelivery({ store, client = createBrevoClient(), hash 
         }
       }
       if (delivered) console.info('Brevo delivery completed:', delivered, 'records');
+      const all = await db.findDeliverableRecords();
+      const summary = JSON.stringify({ total: all.length, completed: all.filter(r => r.status === 'received').length, queued: all.filter(r => r.status === 'queued').length });
+      if (summary !== lastSummary) { console.info('Brevo delivery status:', summary); lastSummary = summary; }
     });
   }
   function kick() {

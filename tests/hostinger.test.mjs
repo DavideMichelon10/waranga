@@ -32,7 +32,7 @@ test('Hostinger serves SPA and validates newsletter requests before reaching pro
   await writeFile(join(path, '.env'), 'PRIVATE');
   await symlink('/etc/passwd', join(path, 'escape.txt'));
   let calls = 0;
-  const handler = createSubscribeHandler({ configured: () => true, store: () => ({ setJSON: async () => {} }), hash: () => 'hashed', limit: async () => {}, reach: () => ({ subscribe: async () => { calls++; return { status: 'pending_confirmation' }; } }) });
+  const handler = createSubscribeHandler({ configured: () => true, store: () => ({ withLock: async (_, fn) => fn(), getJSON: async () => null, setJSON: async () => { calls++; } }), hash: () => 'hashed', limit: async () => {} });
   const server = createHostingerServer({ origin: 'https://test.example', dist: path, handler });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   t.after(() => new Promise(resolve => { server.closeAllConnections(); server.close(resolve); }));
@@ -54,7 +54,7 @@ test('Hostinger serves SPA and validates newsletter requests before reaching pro
   assert.equal(calls, 0);
   const result = await send(input);
   assert.equal(result.status, 200);
-  assert.equal((await result.json()).status, 'pending_confirmation');
+  assert.equal((await result.json()).status, 'accepted');
   assert.equal(calls, 1);
 });
 

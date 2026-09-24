@@ -1,4 +1,4 @@
-# Wānanga — Sanity e Hostinger Reach
+# Wānanga — Sanity, Hostinger e Brevo
 
 ## Sviluppo locale
 
@@ -25,7 +25,7 @@ Non caricare file `.env`, credenziali o database nel repository.
 - Il pannello Studio locale e remoto include Viaggi, Liste d’attesa e Testi del sito, con campi in italiano. Studio remoto aggiornato il 23 settembre 2026; frontend e backend Node.js sono pubblicati su Hostinger; le Functions Netlify non sono in uso.
 - Testi del sito include i testi delle pagine, i pulsanti, le etichette dei moduli e le domande frequenti con le risposte. I valori iniziali corrispondono ai testi già mostrati sul sito.
 - La newsletter mostra un modulo con sola email in homepage e su /newsletter.
-- Newsletter Reach attiva sul dominio di prova Hostinger; iscrizione online verificata il 24 settembre 2026. Configurazione e limiti in [HOSTINGER-NEWSLETTER.md](HOSTINGER-NEWSLETTER.md). `REACH_ENABLED=false` permette di disattivare la raccolta.
+- Tutti i moduli sono salvati nel deposito privato e sincronizzati con Brevo. Vedi [BREVO.md](BREVO.md).
 - Studio pubblicato: https://wananga-v6jdx1wm.sanity.studio/
 - Domini frontend autorizzati in Sanity: https://wananga.it, https://www.wananga.it e https://darkblue-alligator-613930.hostingersite.com (lettura pubblica senza credenziali).
 - Bali (con fotografia) e Testi del sito sono già stati importati come bozze. Accedere al pannello con GitHub, rivederli e premere Publish.
@@ -125,61 +125,11 @@ Per aggiungere una destinazione: Viaggi > Nuovo > compila i campi > genera lo sl
 aggiungi le tappe > Publish. Lo slug diventa /viaggi/nome-del-viaggio.
 "Completo" e "Richieste chiuse" disabilitano l'invito a candidarsi.
 
-## Waiting list e newsletter con Hostinger Reach
+## Moduli e Brevo
 
-Implementati i moduli di iscrizione e le rotte server `/api/waitlist` e `/api/newsletter`. La connessione è attiva sul dominio Hostinger configurato. Negli altri ambienti resta disabilitata finché mancano le
-credenziali e `REACH_ENABLED=true`: il modulo mostra l’indisponibilità solo dopo
-il tentativo di invio e non simula un’iscrizione riuscita.
-
-Da Sanity si possono creare e duplicare pagine `/waiting-list/:slug`, modificare
-foto e testi e collegare il viaggio definitivo. La waiting list richiede email
-e consenso per l’avviso; la newsletter generale ha un consenso separato,
-facoltativo e inizialmente non selezionato.
-
-Il backend aggiunge un tag Reach per ogni partenza e `wananga-newsletter` solo
-su richiesta. I contatti restano in Reach; la prova dei consensi è conservata
-su Hostinger in una directory privata persistente (su Netlify, in Blobs privato), mai nel dataset pubblico Sanity.
-
-Il sito salva i contatti e le preferenze in Reach. Non crea campagne, bozze email,
-né invia email. La pubblicazione o modifica di un viaggio non contatta gli iscritti.
-
-Guida editoriale e configurazione: [WAITING-LISTS.md](WAITING-LISTS.md).
-Lista Bali: http://localhost:4173/waiting-list/bali-prossima-partenza.
-Le vecchie variabili `VITE_NEWSLETTER_ENDPOINT` e `VITE_REACH_FORM_URL` non sono usate.
-
-## Moduli di contatto e candidature
-
-I moduli pubblici inviano a `/api/contact` e `/api/application` sul server
-Hostinger. Non dipendono più da PocketBase. Le richieste compaiono in Reach:
-
-- `wananga-contatti`: richieste da Contattaci;
-- `wananga-candidature`: candidature, con un tag `wananga-viaggio-<slug>`;
-- `wananga-newsletter`: solo per il consenso newsletter, separato e facoltativo.
-
-Aprire il contatto per leggere i campi **Wānanga · …**. Nome, email e telefono
-internazionale usano anche i campi standard. I campi mostrano un’anteprima leggibile; **Wānanga · Apri richieste complete**
-contiene il collegamento riservato ai testi integrali e allo storico.
-Reach ha una scheda per email: i campi riepilogano l’ultimo invio, mentre la
-scheda completa conserva tutte le richieste, con data e consensi. I dati integrali
-restano nel percorso privato Hostinger. Non c’è un nuovo pannello da gestire: si
-apre la scheda dal collegamento nel contatto Reach. Il collegamento è una chiave
-di accesso personale: chi lo possiede può leggere lo storico e non va condiviso pubblicamente.
-
-Il server convalida i campi, controlla che il viaggio pubblicato accetti richieste,
-limita gli invii e protegge dai duplicati. Conferma la ricezione appena la richiesta
-è salvata sul disco privato; un processo sullo stesso server la trasferisce a Reach.
-Se Reach è lento o indisponibile, ritenta automaticamente anche dopo un riavvio:
-il visitatore non deve reinviare il modulo. Nella scheda completa si distingue
-la ricezione dalla sincronizzazione completata. I contatti già disiscritti non
-vengono riattivati. Gli errori di validazione o salvataggio lasciano i dati nel modulo.
-
-`/candidatura-bali` resta valido; gli altri viaggi pubblicati usano
-`/candidatura/:slug`. Il campo età è indipendente dalle note. Non servono modifiche
-allo schema PocketBase né valori di destinazione predefiniti.
-
-Configurazione e limiti Reach: [HOSTINGER-NEWSLETTER.md](HOSTINGER-NEWSLETTER.md).
-Le pagine privacy, cookie e termini restano da completare con testi del titolare;
-questa integrazione non inventa condizioni di viaggio o documenti approvati.
+Contattaci, candidature, newsletter e liste d’attesa usano il backend Node.js
+su Hostinger. Gli invii sono salvati prima della conferma e trasferiti a Brevo
+con tentativi automatici. Configurazione e uso: [BREVO.md](BREVO.md).
 
 ## Dove intervenire nel codice
 
@@ -187,10 +137,10 @@ In questo repository:
 - src/lib/content.js: query, dati iniziali e normalizzazione.
 - src/contexts/ContentContext.jsx: caricamento contenuti pubblicati.
 - src/redesign/Experience.jsx: pagine e catalogo.
-- src/components/ReachNewsletter.jsx: modulo newsletter con sola email.
+- src/components/NewsletterForm.jsx: modulo newsletter con sola email.
 - src/lib/newsletter.js: chiamate ai moduli email sul backend.
 - src/components/WaitingList.jsx e studio/waitlistSchema.js: pagine social e campi editoriali.
-- server/ e netlify/functions/: raccolta contatti Reach e consensi.
+- server/ e netlify/functions/: raccolta contatti Brevo e consensi.
 - studio/schemaTypes.js: campi editoriali.
 
 ## Dati dell’agenzia nel footer
