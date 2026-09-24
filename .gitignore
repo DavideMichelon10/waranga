@@ -9,3 +9,5 @@ dist/
 *.log
 
 .netlify/
+
+hostinger-build/

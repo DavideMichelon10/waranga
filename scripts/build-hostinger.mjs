@@ -1,0 +1,14 @@
+import { cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
+import { resolve } from 'node:path';
+const root = fileURLToPath(new URL('../', import.meta.url));
+const output = resolve(root, 'hostinger-build');
+await rm(output, { recursive: true, force: true });
+await mkdir(resolve(output, 'src'), { recursive: true });
+for (const name of ['dist', 'server', 'app.js']) await cp(resolve(root, name), resolve(output, name), { recursive: true });
+await cp(resolve(root, 'src/lib'), resolve(output, 'src/lib'), { recursive: true });
+const pkg = JSON.parse(await readFile(resolve(root, 'package.json'), 'utf8'));
+pkg.scripts = { start: 'node app.js' };
+await writeFile(resolve(output, 'package.json'), JSON.stringify(pkg, null, 2) + '\n');
+await cp(resolve(root, 'package-lock.json'), resolve(output, 'package-lock.json'));
+console.log('Hostinger output ready: hostinger-build');
