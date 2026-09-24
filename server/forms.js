@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { configured, json, privateKey, reachClient, sanityQuery } from './services.js';
+import { configured, json, privateKey, sanityQuery } from './services.js';
 import { saveFormRecord } from './form-history.js';
 import { ServiceError } from './reach.js';
 
@@ -30,7 +30,7 @@ export function validateForm(input, kind) {
   }
   return data;
 }
-export function createFormHandler({ store, historySecret = process.env.CONSENT_HASH_SECRET, reach = reachClient, enabled = configured, hash = privateKey, getTrip = slug => sanityQuery('*[_type == "trip" && slug.current == $slug][0]{_id,title,status}', { slug }) }) {
+export function createFormHandler({ store, historySecret = process.env.CONSENT_HASH_SECRET, wake = () => {}, enabled = configured, hash = privateKey, getTrip = slug => sanityQuery('*[_type == "trip" && slug.current == $slug][0]{_id,title,status}', { slug }) }) {
   return async (request, context = {}) => {
     if (request.method !== 'POST') return json({ error: 'method_not_allowed' }, 405);
     if (request.headers.get('origin') !== new URL(request.url).origin) return json({ error: 'origin_not_allowed' }, 403);
@@ -58,32 +58,27 @@ export function createFormHandler({ store, historySecret = process.env.CONSENT_H
       if (!enabled()) return json({ error: 'not_configured' }, 503);
       const db = store();
       const key = `forms/${hash(data.email)}/${data.requestId}`;
-      return await db.withLock(hash(data.email), async () => {
+      const response = await db.withLock(hash(data.email), async () => {
         const previous = await db.getJSON(key);
-        if (previous?.status === 'received') return json({ status: 'received', newsletter: previous.newsletterStatus });
-        await db.limit('forms:' + hash(context.ip || 'unknown'), 4);
-        await db.limit('reach-subscriptions', 10);
+        if (['received', 'queued'].includes(previous?.status)) return json({ status: 'received', newsletter: previous.newsletterStatus || (previous.consenso_newsletter ? 'requested' : 'not_requested') });
+        await db.limit('forms:' + hash(data.email), 4);
+        await db.limit('forms-global', 30);
         if (kind === 'application') {
           const trip = await getTrip(data.tripSlug);
           if (!trip || !['interest','open'].includes(trip.status)) throw new ServiceError('trip_closed', 409);
           data.viaggio = trip.title;
         }
-        const record = { ...data, at: previous?.at || new Date().toISOString(), privacyVersion: FORM_PRIVACY_VERSION, status: 'sending' };
-        const token = await saveFormRecord(db, key, record, { secret: historySecret });
-        const historyUrl = new URL('/richieste/' + token, request.url).href;
-        try {
-          const result = await reach().submitForm({ ...record, historyUrl });
-          await saveFormRecord(db, key, { ...record, status: 'received', contactUuid: result.contactUuid, newsletterStatus: result.newsletter }, { secret: historySecret });
-          return json({ status: 'received', newsletter: result.newsletter });
-        } catch (error) {
-          await saveFormRecord(db, key, { ...record, status: 'failed', code: error instanceof ServiceError ? error.code : 'service_error' }, { secret: historySecret });
-          throw error;
-        }
+        const record = { ...data, at: previous?.at || new Date().toISOString(), privacyVersion: FORM_PRIVACY_VERSION, status: 'queued' };
+        await saveFormRecord(db, key, record, { secret: historySecret });
+        return json({ status: 'received', newsletter: data.consenso_newsletter ? 'requested' : 'not_requested' });
       });
+      // The request is durable before confirming. Reach delivery can resume after a restart.
+      wake();
+      return response;
     } catch (error) {
       const code = error instanceof ServiceError ? error.code : 'service_error';
       console.error('Form submission failed:', code);
-      return json({ error: ['invalid_fields','invalid_email','invalid_phone','consent_required','trip_closed','rate_limit','request_in_progress'].includes(code) ? code : 'submission_failed' }, error instanceof ServiceError ? error.status : 503);
+      return json({ error: ['invalid_fields','invalid_email','invalid_phone','consent_required','trip_closed','trips_unavailable','rate_limit','request_in_progress'].includes(code) ? code : 'submission_failed' }, error instanceof ServiceError ? error.status : 503);
     }
   };
 }

@@ -118,16 +118,19 @@ export function createReach({ token, profileId, fetcher = fetch, pause = ms => n
       const phone = data.telefono.replace(/[\s().-]/g, '').replace(/^00/, '+');
       if (/^\+[1-9]\d{6,14}$/.test(phone)) body.phone = phone;
     }
-    await request('/contacts/' + encodeURIComponent(contact.uuid), 'PATCH', body);
-    for (const tag of await ensureTags(names)) await request(`/tags/${encodeURIComponent(tag.uuid)}/contacts/${encodeURIComponent(contact.uuid)}`, 'POST');
-    let newsletter = 'not_requested';
-    if (data.consenso_newsletter) {
-      if (!['subscribed','pending','confirmed'].includes(contact.subscription_status)) newsletter = 'not_subscribed';
-      else {
-        try { newsletter = (await subscribe(data.email, [NEWSLETTER_TAG])).status; }
-        catch { newsletter = 'failed'; }
-      }
-    }
+    const canSubscribe = ['subscribed', 'pending'].includes(contact.subscription_status);
+    if (data.consenso_newsletter && canSubscribe) names.push(NEWSLETTER_TAG);
+    // A contact lookup already tells us the subscription state. Do not repeat the
+    // entire subscribe flow, or recreate/reassign tags the contact already has.
+    const missingNames = names.filter(name => !details.tags?.some(tag => tag.value === name));
+    const [, tags] = await Promise.all([
+      request('/contacts/' + encodeURIComponent(contact.uuid), 'PATCH', body),
+      missingNames.length ? ensureTags(missingNames) : [],
+    ]);
+    await Promise.all(tags.map(tag => request(`/tags/${encodeURIComponent(tag.uuid)}/contacts/${encodeURIComponent(contact.uuid)}`, 'POST')));
+    const newsletter = !data.consenso_newsletter ? 'not_requested'
+      : !canSubscribe ? 'not_subscribed'
+      : contact.subscription_status === 'pending' ? 'pending_confirmation' : 'subscribed';
     return { contactUuid: contact.uuid, newsletter };
   }
   return { subscribe, submitForm };

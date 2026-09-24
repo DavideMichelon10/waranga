@@ -1,9 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, rm, readFile, readdir } from 'node:fs/promises';
+import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { createFormDelivery } from '../server/form-delivery.js';
 import { createFormHandler } from '../server/forms.js';
 import { createHostingerStore } from '../server/hostinger-store.js';
 import { createReach } from '../server/reach.js';
@@ -18,27 +19,42 @@ async function fixture(t) {
   const db = createHostingerStore(directory);
   return { db, directory };
 }
-test('invalid forms, cross-origin submissions and closed trips never reach provider', async t => {
-  const { db } = await fixture(t); let calls = 0;
-  const handler = createFormHandler({ historySecret: 'unit-test-history-secret', store: () => db, enabled: () => true, hash: s => s, getTrip: async () => ({ title: 'Bali', status: 'closed' }), reach: () => ({ submitForm: async () => { calls++; } }) });
+test('invalid forms, cross-origin submissions and closed trips never enter the delivery queue', async t => {
+  const { db } = await fixture(t);
+  const handler = createFormHandler({ historySecret: 'unit-test-history-secret', store: () => db, enabled: () => true, hash: s => s, getTrip: async () => ({ title: 'Bali', status: 'closed' }) });
   for (const bad of [{...input(), privacy_accepted:false},{...input(),consenso_newsletter:'false'},{...input(),email:'bad'},{...input(),messaggio:'x'.repeat(5001)},{...input(),website:'spam'},{...input(),requestId:'../secret'}]) assert.equal((await handler(request(bad))).status,400);
   assert.equal((await handler(request(input(),'/api/contact','https://other.example'))).status,403);
   assert.equal((await handler(request({...application(),eta:0},'/api/application'))).status,400);
   assert.equal((await handler(request(application(),'/api/application'))).status,409);
-  assert.equal(calls,0);
+  assert.equal((await db.findForms()).length,0);
 });
-test('submission is successful only after Reach confirms; retries are idempotent and failure recoverable', async t => {
-  const { db,directory } = await fixture(t); let calls=0; let fail=true;
-  const handler=createFormHandler({ historySecret: 'unit-test-history-secret', store:()=>db,enabled:()=>true,hash:s=>s,reach:()=>({ submitForm:async()=>{calls++; if(fail)throw Error(); return {contactUuid:'c',newsletter:'not_requested'};} }) });
-  const data=input();
-  assert.equal((await handler(request(data))).status,503);
-  fail=false;
-  assert.equal((await handler(request(data))).status,200);
-  assert.equal((await handler(request(data))).status,200);
-  assert.equal(calls,2);
-  const records=await db.findForms(data.email); assert.equal(records.length,1);
-  const saved=records[0];
-  assert.equal(saved.status,'received');assert.equal(saved.messaggio,data.messaggio);assert.equal(saved.consenso_newsletter,false);
+test('a confirmed request is durably queued once before Reach responds, including after a restart', async t => {
+  const { db, directory } = await fixture(t); let calls = 0; let finish;
+  const handler = createFormHandler({ historySecret: 'unit-test-history-secret', store: () => db, enabled: () => true, hash: s => s });
+  const data = input();
+  assert.equal((await handler(request(data))).status, 200);
+  assert.equal((await handler(request(data))).status, 200);
+  const saved = await db.findForms(data.email);
+  assert.equal(saved.length, 1); assert.equal(saved[0].status, 'queued');
+  assert.equal(saved[0].messaggio, data.messaggio);
+  const afterRestart = createHostingerStore(directory);
+  const delivery = createFormDelivery({ origin: 'https://test.example', historySecret: 'unit-test-history-secret', store: () => afterRestart, hash: s => s,
+    reach: () => ({ submitForm: async () => { calls++; return new Promise(resolve => { finish = resolve; }); } }),
+  });
+  const pending = delivery.kick();
+  while (!finish) await new Promise(resolve => setImmediate(resolve));
+  // The next visitor can submit while a slow provider is still processing this email.
+  assert.equal((await handler(request({ ...data, requestId: randomUUID(), messaggio: 'Second request' }))).status, 200);
+  finish({ contactUuid: 'c', newsletter: 'not_requested' }); await pending;
+  assert.equal(calls, 1);
+  assert.equal((await handler(request(data))).status, 200);
+  assert.equal((await db.findForms(data.email)).find(row => row.requestId === data.requestId).status, 'received');
+});
+test('a storage failure never returns a successful submission', async () => {
+  const handler = createFormHandler({ historySecret: 'test', enabled: () => true, hash: s => s, store: () => ({
+    withLock: async (_, operation) => operation(), getJSON: async () => null, limit: async () => {}, setJSON: async () => { throw Error('disk failure'); },
+  }) });
+  assert.equal((await handler(request(input()))).status, 503);
 });
 test('concurrent submissions for one email are serialized and lock releases after failure',async t=>{
   const {db}=await fixture(t);let release;
@@ -119,7 +135,6 @@ test('forms from tabs opened before the Reach migration use the same validated d
   const { db } = await fixture(t); const delivered = [];
   const handler = createFormHandler({ historySecret: 'test-secret', store: () => db, enabled: () => true, hash: s => s,
     getTrip: async slug => slug === 'bali' ? { title: 'Bali', status: 'interest' } : null,
-    reach: () => ({ submitForm: async data => { delivered.push(data); return { contactUuid: 'c', newsletter: 'not_requested' }; } }),
   });
   const contact = input(); delete contact.requestId;
   const path = '/hcgi/platform/api/collections/contatti/records';
@@ -131,6 +146,7 @@ test('forms from tabs opened before the Reach migration use the same validated d
   const applicationPath = '/hcgi/platform/api/collections/candidature/records';
   assert.equal((await handler(request({ ...oldApplication, info_utili: 'Età: 0 anni' }, applicationPath))).status, 400);
   assert.equal((await handler(request(oldApplication, applicationPath))).status, 200);
+  await createFormDelivery({ origin: 'https://test.example', historySecret: 'test-secret', store: () => db, hash: s => s, reach: () => ({ submitForm: async data => { delivered.push(data); return { contactUuid: 'c', newsletter: 'not_requested' }; } }) }).kick();
   assert.equal(delivered.length, 2);
   assert.equal(delivered[0].kind, 'contact');
   assert.equal(delivered[0].messaggio, contact.messaggio);
@@ -139,4 +155,18 @@ test('forms from tabs opened before the Reach migration use the same validated d
   assert.equal(delivered[1].info_utili, 'Preferisco la sera.');
   assert.equal(delivered[1].tripSlug, 'bali');
   assert.equal((await db.findForms(contact.email)).length, 2);
+});
+
+
+test('existing tagged contacts need only lookup, details and one update', async () => {
+  const calls = [];
+  const reach = createReach({ token: 'test', profileId: 'p', fetcher: async (url, options) => {
+    calls.push({ url, method: options.method });
+    if (url.includes('/contacts?')) return Response.json({ data: [{ uuid: 'c', email: 'test@example.com', subscription_status: 'subscribed' }] });
+    if (options.method === 'GET') return Response.json({ fields: [], tags: ['wananga-candidature', 'wananga-viaggio-bali', 'wananga-newsletter'].map(value => ({ value })) });
+    return Response.json({ success: true });
+  } });
+  const result = await reach.submitForm({ ...application(), kind: 'application', viaggio: 'Bali', at: new Date().toISOString(), consenso_newsletter: true });
+  assert.equal(result.newsletter, 'subscribed');
+  assert.deepEqual(calls.map(call => call.method), ['GET', 'GET', 'PATCH']);
 });

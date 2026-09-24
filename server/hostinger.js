@@ -3,6 +3,8 @@ import { readFile, realpath } from 'node:fs/promises';
 import { resolve, extname, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { handleHistory } from './form-history.js';
+import { createFormDelivery } from './form-delivery.js';
+import { createFormTrips } from './form-trips.js';
 import { createFormHandler } from './forms.js';
 import { createSubscribeHandler } from './subscribe.js';
 import { createHostingerStore } from './hostinger-store.js';
@@ -23,8 +25,11 @@ export function createHostingerServer({ origin = process.env.PUBLIC_ORIGIN, dire
     store: () => (store ||= createHostingerStore(directory)),
     limit: (storage, key, limit) => storage.limit(key, limit),
   });
-  const forms = createFormHandler({ store: () => (store ||= createHostingerStore(directory)) });
-  return createServer(async (req, res) => {
+  const formStore = () => (store ||= createHostingerStore(directory));
+  const delivery = createFormDelivery({ store: formStore, origin });
+  const trips = createFormTrips({ store: formStore });
+  const forms = createFormHandler({ store: formStore, getTrip: trips.get, wake: () => { void delivery.kick(); } });
+  const server = createServer(async (req, res) => {
     const sendJson = (status, error) => { res.writeHead(status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify({ error })); };
     try {
       // Use the configured public origin, never untrusted Host/forwarded headers.
@@ -73,6 +78,13 @@ export function createHostingerServer({ origin = process.env.PUBLIC_ORIGIN, dire
       res.end(req.method === 'HEAD' ? undefined : body);
     } catch { sendJson(503, 'service_unavailable'); }
   });
+  server.on('listening', () => {
+    if (!directory || process.env.REACH_ENABLED !== 'true') return;
+    delivery.start();
+    void trips.refresh().catch(() => console.error('Form trip catalog refresh delayed'));
+  });
+  server.on('close', () => delivery.stop());
+  return server;
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

@@ -166,10 +166,12 @@ apre la scheda dal collegamento nel contatto Reach. Il collegamento è una chiav
 di accesso personale: chi lo possiede può leggere lo storico e non va condiviso pubblicamente.
 
 Il server convalida i campi, controlla che il viaggio pubblicato accetti richieste,
-limita gli invii e protegge dai duplicati. In caso di errore conserva i dati nel
-modulo e non dichiara la richiesta ricevuta finché Reach non l’ha salvata.
-Una newsletter non completata viene segnalata separatamente dopo il salvataggio
-della richiesta, senza riattivare contatti già disiscritti.
+limita gli invii e protegge dai duplicati. Conferma la ricezione appena la richiesta
+è salvata sul disco privato; un processo sullo stesso server la trasferisce a Reach.
+Se Reach è lento o indisponibile, ritenta automaticamente anche dopo un riavvio:
+il visitatore non deve reinviare il modulo. Nella scheda completa si distingue
+la ricezione dalla sincronizzazione completata. I contatti già disiscritti non
+vengono riattivati. Gli errori di validazione o salvataggio lasciano i dati nel modulo.
 
 `/candidatura-bali` resta valido; gli altri viaggi pubblicati usano
 `/candidatura/:slug`. Il campo età è indipendente dalle note. Non servono modifiche

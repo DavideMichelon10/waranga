@@ -118,12 +118,28 @@ attiva. Le campagne newsletter vanno indirizzate al tag `wananga-newsletter`.
 Non è stata attivata alcuna automazione né alcun invio email.
 
 Reach conserva un contatto per email e mostra gli ultimi valori di ogni modulo.
-Ogni invio conserva anche una copia integrale privata sul server con ID casuale,
-esito e consenso. Le richieste fallite si possono riprovare; quelle completate
-con lo stesso ID non vengono reinviate. I lock in `PRIVATE_DATA_DIR/locks` evitano
-aggiornamenti contemporanei dello stesso contatto. Dopo un arresto anomalo,
-un eventuale lock orfano va rimosso dall’amministratore solo dopo aver verificato
-che nessun processo stia elaborando quel contatto.
+Ogni invio viene prima salvato integralmente sul server con ID casuale, esito e
+consenso. La risposta HTTP conferma questo salvataggio, senza attendere Reach.
+`server/form-delivery.js` elabora i record `queued` all’avvio, dopo gli invii e
+ogni cinque secondi. Dopo un errore riprova con attese crescenti fino a cinque
+minuti. La coda è nei record privati: nessun servizio aggiuntivo da configurare.
+Le richieste dello stesso contatto sono elaborate in ordine e gli stessi ID non
+creano copie aggiuntive. Un solo processo alla volta consegna a Reach; i lock
+orfani scadono dopo 30 secondi e quelli attivi si rinnovano automaticamente.
+
+La candidatura verifica un catalogo Sanity conservato sul server: viene caricato
+all’avvio e aggiornato dopo 30 secondi al successivo utilizzo. Oltre cinque minuti
+serve una nuova lettura riuscita prima di accettare candidature. Il limite degli
+invii è quattro al minuto per email e trenta complessivi, così gli utenti dietro
+lo stesso proxy Hostinger non si bloccano a vicenda.
+
+I contatti già presenti con tutti i tag necessari richiedono tre chiamate Reach
+(ricerca, dettagli, aggiornamento). Non viene ripetuto il flusso newsletter dentro
+la candidatura e non vengono riassegnati i tag già presenti. Lo stato della
+richiesta nella scheda privata indica quando Reach ha completato il salvataggio.
+I log `Form Reach sync delayed` riportano solo il codice di errore: nessun token,
+testo del modulo o indirizzo email. I vecchi record `failed` restano consultabili;
+la coda automatica gestisce gli invii salvati con il nuovo stato `queued`.
 
 Per la prova locale completa avviare `app.js` con variabili server, origine locale
 e una directory privata di test esterna al progetto. Il server Vite di sviluppo
@@ -138,8 +154,9 @@ leggibili nel browser pubblico. Questa impostazione è esterna al deploy Git.
 
 Reach può accettare una creazione prima di rendere il nuovo contatto ricercabile.
 Il backend effettua tentativi di lettura con attese brevi prima di aggiornare
-campi e tag. Se il contatto non diventa disponibile, segnala errore e conserva
-la richiesta per il nuovo tentativo, senza dichiarare una consegna inesistente.
+campi e tag. Se il contatto non diventa disponibile, la richiesta resta nella
+coda persistente per il nuovo tentativo. La conferma sul sito riguarda la ricezione;
+la scheda riservata indica separatamente la sincronizzazione completata in Reach.
 
 ## Uso quotidiano e storico
 
