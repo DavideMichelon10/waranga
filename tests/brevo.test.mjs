@@ -65,7 +65,7 @@ test('two applications and a contact message remain separate on one person with 
   assert.equal(r.contacts.length, 1); assert.equal(r.deals.length, 3); assert.equal(r.notes.length, 3);
   assert.equal(r.contacts[0].emailBlacklisted, true);
   assert.equal(r.contacts[0].attributes.NOME, 'Test');
-  assert.ok(r.notes[0].text.includes('&lt;script&gt;')); assert.ok(!r.notes[0].text.includes('<script>'));
+  assert.ok(r.notes[0].text.includes('&amp;lt;script&amp;gt;')); assert.ok(!r.notes[0].text.includes('<script>'));
   assert.ok(r.notes[1].text.includes(second.info_utili)); assert.ok(r.notes[2].text.includes('c'.repeat(5000)));
   assert.deepEqual(r.deals.map(d => d.attributes.trip), ['Bali', 'Thailandia', 'Richiesta generale']);
   assert.ok(r.notes.every(n => n.contactIds[0] === 1 && n.dealIds.length === 1));

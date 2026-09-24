@@ -34,7 +34,8 @@ export const dealAttributes = {
   date: 'Data invio candidatura', phone: 'Telefono candidato', people: 'Numero partecipanti',
 };
 export const formLabel = r => ({ contact: 'Contattaci', application: 'Candidatura viaggio', newsletter: 'Newsletter', waitlist: 'Lista d’attesa' }[r.kind] || 'Importazione contatto');
-const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+// Brevo decodes entities once before sanitizing HTML; preserve literal user markup.
+const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])).replace(/&/g, '&amp;');
 export const submissionReference = record => createHash('sha256').update(record.email.toLowerCase() + '\0' + record.requestId).digest('hex');
 export function submissionNote(record) {
   const rows = [
