@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { trialEligible } from './brevo.js';
 import { configured, json, privateKey, sanityQuery } from './services.js';
 import { saveFormRecord } from './form-history.js';
 import { ServiceError } from './reach.js';
@@ -30,7 +31,7 @@ export function validateForm(input, kind) {
   }
   return data;
 }
-export function createFormHandler({ store, historySecret = process.env.CONSENT_HASH_SECRET, wake = () => {}, enabled = configured, hash = privateKey, getTrip = slug => sanityQuery('*[_type == "trip" && slug.current == $slug][0]{_id,title,status}', { slug }) }) {
+export function createFormHandler({ store, historySecret = process.env.CONSENT_HASH_SECRET, wake = () => {}, brevoEligible = trialEligible, enabled = configured, hash = privateKey, getTrip = slug => sanityQuery('*[_type == "trip" && slug.current == $slug][0]{_id,title,status}', { slug }) }) {
   return async (request, context = {}) => {
     if (request.method !== 'POST') return json({ error: 'method_not_allowed' }, 405);
     if (request.headers.get('origin') !== new URL(request.url).origin) return json({ error: 'origin_not_allowed' }, 403);
@@ -68,7 +69,7 @@ export function createFormHandler({ store, historySecret = process.env.CONSENT_H
           if (!trip || !['interest','open'].includes(trip.status)) throw new ServiceError('trip_closed', 409);
           data.viaggio = trip.title;
         }
-        const record = { ...data, at: previous?.at || new Date().toISOString(), privacyVersion: FORM_PRIVACY_VERSION, status: 'queued' };
+        const record = { ...data, at: previous?.at || new Date().toISOString(), privacyVersion: FORM_PRIVACY_VERSION, status: 'queued', ...(brevoEligible(data.email) ? { brevoTrial: true } : {}) };
         await saveFormRecord(db, key, record, { secret: historySecret });
         return json({ status: 'received', newsletter: data.consenso_newsletter ? 'requested' : 'not_requested' });
       });

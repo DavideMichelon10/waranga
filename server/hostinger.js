@@ -4,6 +4,7 @@ import { resolve, extname, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { handleHistory } from './form-history.js';
 import { createFormDelivery } from './form-delivery.js';
+import { createBrevoDelivery } from './brevo-delivery.js';
 import { createFormTrips } from './form-trips.js';
 import { createFormHandler } from './forms.js';
 import { createSubscribeHandler } from './subscribe.js';
@@ -27,8 +28,9 @@ export function createHostingerServer({ origin = process.env.PUBLIC_ORIGIN, dire
   });
   const formStore = () => (store ||= createHostingerStore(directory));
   const delivery = createFormDelivery({ store: formStore, origin });
+  const brevo = process.env.BREVO_TRIAL_ENABLED === 'true' && process.env.BREVO_API_KEY ? createBrevoDelivery({ store: formStore }) : null;
   const trips = createFormTrips({ store: formStore });
-  const forms = createFormHandler({ store: formStore, getTrip: trips.get, wake: () => { void delivery.kick(); } });
+  const forms = createFormHandler({ store: formStore, getTrip: trips.get, wake: () => { void delivery.kick(); void brevo?.kick(); } });
   const server = createServer(async (req, res) => {
     const sendJson = (status, error) => { res.writeHead(status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify({ error })); };
     try {
@@ -81,9 +83,10 @@ export function createHostingerServer({ origin = process.env.PUBLIC_ORIGIN, dire
   server.on('listening', () => {
     if (!directory || process.env.REACH_ENABLED !== 'true') return;
     delivery.start();
+    brevo?.start();
     void trips.refresh().catch(() => console.error('Form trip catalog refresh delayed'));
   });
-  server.on('close', () => delivery.stop());
+  server.on('close', () => { delivery.stop(); brevo?.stop(); });
   return server;
 }
 
