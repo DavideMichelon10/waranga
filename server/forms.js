@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { configured, json, privateKey, reachClient, sanityQuery } from './services.js';
 import { saveFormRecord } from './form-history.js';
 import { ServiceError } from './reach.js';
@@ -38,7 +39,21 @@ export function createFormHandler({ store, historySecret = process.env.CONSENT_H
       const raw = await request.text();
       if (Buffer.byteLength(raw) > 24000) throw new ServiceError('invalid_fields', 413);
       let input; try { input = JSON.parse(raw); } catch { throw new ServiceError('invalid_fields', 400); }
-      const kind = new URL(request.url).pathname === '/api/contact' ? 'contact' : 'application';
+      const path = new URL(request.url).pathname;
+      const legacyContact = path === '/hcgi/platform/api/collections/contatti/records';
+      const legacyApplication = path === '/hcgi/platform/api/collections/candidature/records';
+      const kind = path === '/api/contact' || legacyContact ? 'contact' : 'application';
+      // Tabs opened before the Reach migration still submit the PocketBase payload.
+      // Keep the same validation, consent checks, storage and Reach delivery path.
+      if ((legacyContact || legacyApplication) && input && typeof input === 'object' && !Array.isArray(input)) {
+        input = { ...input, requestId: input.requestId || randomUUID() };
+        if (legacyApplication) {
+          const age = typeof input.info_utili === 'string' && /^Età: (\d+) anni(?:\n\n|$)/.exec(input.info_utili);
+          input.tripSlug = input.viaggio === 'Bali' ? 'bali' : '';
+          input.eta = age ? Number(age[1]) : undefined;
+          if (age) input.info_utili = input.info_utili.slice(age[0].length);
+        }
+      }
       const data = validateForm(input, kind);
       if (!enabled()) return json({ error: 'not_configured' }, 503);
       const db = store();

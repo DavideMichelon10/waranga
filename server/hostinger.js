@@ -35,8 +35,9 @@ export function createHostingerServer({ origin = process.env.PUBLIC_ORIGIN, dire
         res.writeHead(response.status, Object.fromEntries(response.headers));
         return res.end(await response.text());
       }
-      if (['/api/newsletter', '/api/waitlist', '/api/contact', '/api/application'].includes(url.pathname)) {
-        const isForm = ['/api/contact', '/api/application'].includes(url.pathname);
+      const formPaths = ['/api/contact', '/api/application', '/hcgi/platform/api/collections/contatti/records', '/hcgi/platform/api/collections/candidature/records'];
+      if (['/api/newsletter', '/api/waitlist', ...formPaths].includes(url.pathname)) {
+        const isForm = formPaths.includes(url.pathname);
         if (req.method !== 'POST') { res.setHeader('Allow', 'POST'); return sendJson(405, 'method_not_allowed'); }
         const chunks = []; let size = 0;
         for await (const chunk of req) {
@@ -68,7 +69,7 @@ export function createHostingerServer({ origin = process.env.PUBLIC_ORIGIN, dire
       }
       if (!filename.startsWith(root + sep)) return sendJson(404, 'not_found');
       const body = await readFile(filename);
-      res.writeHead(200, { 'Content-Type': mime[extname(filename)] || 'application/octet-stream', 'X-Content-Type-Options': 'nosniff', 'Cache-Control': extname(filename) === '.html' ? 'no-cache' : 'public, max-age=3600' });
+      res.writeHead(200, { 'Content-Type': mime[extname(filename)] || 'application/octet-stream', 'X-Content-Type-Options': 'nosniff', 'Cache-Control': extname(filename) === '.html' ? 'no-store' : 'public, max-age=3600' });
       res.end(req.method === 'HEAD' ? undefined : body);
     } catch { sendJson(503, 'service_unavailable'); }
   });

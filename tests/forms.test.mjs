@@ -113,3 +113,30 @@ test('new Reach contacts can become queryable after the create acknowledgement',
   const result = await reach.submitForm({ ...input(), kind: 'contact', at: new Date().toISOString() });
   assert.equal(result.contactUuid, 'new'); assert.equal(patches, 1); assert.deepEqual(delays, [500]);
 });
+
+
+test('forms from tabs opened before the Reach migration use the same validated delivery and storage', async t => {
+  const { db } = await fixture(t); const delivered = [];
+  const handler = createFormHandler({ historySecret: 'test-secret', store: () => db, enabled: () => true, hash: s => s,
+    getTrip: async slug => slug === 'bali' ? { title: 'Bali', status: 'interest' } : null,
+    reach: () => ({ submitForm: async data => { delivered.push(data); return { contactUuid: 'c', newsletter: 'not_requested' }; } }),
+  });
+  const contact = input(); delete contact.requestId;
+  const path = '/hcgi/platform/api/collections/contatti/records';
+  assert.equal((await handler(request(contact, path, 'https://other.example'))).status, 403);
+  assert.equal((await handler(request({ ...contact, privacy_accepted: false }, path))).status, 400);
+  assert.equal((await handler(request(contact, path))).status, 200);
+  const oldApplication = { ...application(), viaggio: 'Bali', info_utili: 'Età: 30 anni\n\nPreferisco la sera.' };
+  delete oldApplication.requestId; delete oldApplication.eta; delete oldApplication.tripSlug;
+  const applicationPath = '/hcgi/platform/api/collections/candidature/records';
+  assert.equal((await handler(request({ ...oldApplication, info_utili: 'Età: 0 anni' }, applicationPath))).status, 400);
+  assert.equal((await handler(request(oldApplication, applicationPath))).status, 200);
+  assert.equal(delivered.length, 2);
+  assert.equal(delivered[0].kind, 'contact');
+  assert.equal(delivered[0].messaggio, contact.messaggio);
+  assert.equal(delivered[1].kind, 'application');
+  assert.equal(delivered[1].eta, 30);
+  assert.equal(delivered[1].info_utili, 'Preferisco la sera.');
+  assert.equal(delivered[1].tripSlug, 'bali');
+  assert.equal((await db.findForms(contact.email)).length, 2);
+});

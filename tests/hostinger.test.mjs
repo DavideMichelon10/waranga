@@ -36,7 +36,13 @@ test('Hostinger serves SPA and validates newsletter requests before reaching pro
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   t.after(() => new Promise(resolve => { server.closeAllConnections(); server.close(resolve); }));
   const base = `http://127.0.0.1:${server.address().port}`;
-  assert.match(await (await fetch(base + '/newsletter', { headers: { Accept: 'text/html' } })).text(), /Wananga/);
+  const page = await fetch(base + '/newsletter', { headers: { Accept: 'text/html' } });
+  assert.equal(page.headers.get('cache-control'), 'no-store');
+  assert.match(await page.text(), /Wananga/);
+  for (const route of ['/hcgi/platform/api/collections/contatti/records', '/hcgi/platform/api/collections/candidature/records']) {
+    assert.equal((await fetch(base + route)).status, 405);
+    assert.equal((await fetch(base + route, { method: 'POST', headers: { Origin: 'https://other.example', 'Content-Type': 'application/json' }, body: '{}' })).status, 403);
+  }
   for (const route of ['/.env', '/escape.txt', '/api/unknown', '/missing.js']) assert.equal((await fetch(base + route)).status, 404);
   assert.equal((await fetch(base + '/api/newsletter')).status, 405);
   const send = (body, origin = 'https://test.example') => fetch(base + '/api/newsletter', { method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
