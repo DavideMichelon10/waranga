@@ -16,6 +16,7 @@ function remote() {
   async function api(path, method = 'GET', body) {
     calls.push({ path, method, body });
     const url = new URL(path, 'https://test.example');
+    if (path === '/contacts/attributes') return { attributes: [{ name: 'NOME', field_key: 'firstname' }] };
     if (path === '/crm/pipeline/details/all') return [{ pipeline: 'p', stages: [{ id: 's', name: 'New' }] }];
     if (path === '/crm/attributes/deals') return Object.entries(trialAttributes).map(([internalName, label]) => ({ internalName, label, attributeTypeName: 'text' }));
     if (path.startsWith('/contacts/') && method === 'GET') {
@@ -57,10 +58,12 @@ test('two applications and a contact message remain separate on one person with 
   for (const item of [first, second, record({ kind: 'contact', messaggio: 'c'.repeat(5000), viaggio: undefined })]) await client.submit(item, {}, async () => {});
   assert.equal(r.contacts.length, 1); assert.equal(r.deals.length, 3); assert.equal(r.notes.length, 3);
   assert.equal(r.contacts[0].emailBlacklisted, true);
+  assert.equal(r.contacts[0].attributes.NOME, 'Test');
   assert.ok(r.notes[0].text.includes('&lt;script&gt;')); assert.ok(!r.notes[0].text.includes('<script>'));
   assert.ok(r.notes[1].text.includes(second.info_utili)); assert.ok(r.notes[2].text.includes('c'.repeat(5000)));
   assert.deepEqual(r.deals.map(d => d.attributes.trip), ['Bali', 'Thailandia', 'Richiesta generale']);
   assert.ok(r.notes.every(n => n.contactIds[0] === 1 && n.dealIds.length === 1));
+  assert.ok(r.deals.every(d => !('pipeline' in d.attributes) && !('deal_stage' in d.attributes)), 'default placement must be left to Brevo on accounts rejecting explicit default IDs');
 });
 test('existing marketing suppression is not changed even when a form requests newsletter', async () => {
   for (const emailBlacklisted of [false, true]) {

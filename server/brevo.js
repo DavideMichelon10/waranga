@@ -15,7 +15,15 @@ export function createBrevoApi({ token = process.env.BREVO_API_KEY, fetcher = fe
       });
     } catch { throw new BrevoError('brevo_network_error'); }
     // Never log response bodies: they may contain contact data or credentials.
-    if (!response.ok) throw new BrevoError(`brevo_http_${response.status}`, response.status);
+    if (!response.ok) {
+      const error = new BrevoError(`brevo_http_${response.status}`, response.status);
+      if (response.status === 401) {
+        const data = await response.json().catch(() => ({}));
+        const ip = /unrecognised IP address ((?:\d{1,3}\.){3}\d{1,3})/.exec(data.message || '')?.[1];
+        if (ip && ip.split('.').every(part => Number(part) <= 255)) error.unauthorizedIp = ip;
+      }
+      throw error;
+    }
     if (response.status === 204) return null;
     try { return await response.json(); } catch { throw new BrevoError('brevo_invalid_response'); }
   };
@@ -47,12 +55,14 @@ export function createBrevoTrialClient({ api = createBrevoApi(), pipelineId = pr
   let config;
   async function configuration() {
     if (config) return config;
-    const [pipelines, attributes] = await Promise.all([api('/crm/pipeline/details/all'), api('/crm/attributes/deals')]);
+    const [pipelines, attributes, contactAttributes] = await Promise.all([api('/crm/pipeline/details/all'), api('/crm/attributes/deals'), api('/contacts/attributes')]);
     const pipeline = pipelineId ? pipelines.find(p => p.pipeline === pipelineId) : pipelines.length === 1 ? pipelines[0] : null;
     const stage = pipeline?.stages?.find(s => s.id === stageId) || (!stageId && pipeline?.stages?.[0]);
     const fields = Object.fromEntries(Object.entries(trialAttributes).map(([key, label]) => [key, attributes.find(a => a.label === label && a.attributeTypeName === 'text')?.internalName]));
     if (!pipeline || !stage || Object.values(fields).some(v => !v)) throw new BrevoError('brevo_trial_setup_required');
-    return (config = { pipeline: pipeline.pipeline, stage: stage.id, fields });
+    const nameField = contactAttributes.attributes?.find(a => a.field_key === 'firstname')?.name || contactAttributes.attributes?.find(a => ['FIRSTNAME', 'NOME', 'PRENOM'].includes(a.name))?.name;
+    if (!nameField) throw new BrevoError('brevo_contact_name_field_missing');
+    return (config = { pipeline: pipeline.pipeline, stage: stage.id, fields, nameField, placement: pipelineId || stageId ? { pipeline: pipeline.pipeline, deal_stage: stage.id } : {} });
   }
   async function findPaged(path, select, match) {
     for (let page = 0; page < 100; page++) {
@@ -76,7 +86,7 @@ export function createBrevoTrialClient({ api = createBrevoApi(), pipelineId = pr
       catch (error) { if (error.status !== 404) throw error; }
       if (!contact) {
         // Trial contacts are not subscribed to marketing. Existing preferences are untouched.
-        contact = await api('/contacts', 'POST', { email: record.email, attributes: { FIRSTNAME: record.nome }, emailBlacklisted: true, smsBlacklisted: true, updateEnabled: false });
+        contact = await api('/contacts', 'POST', { email: record.email, attributes: { [c.nameField]: record.nome }, emailBlacklisted: true, smsBlacklisted: true, updateEnabled: false });
       }
       if (!Number.isInteger(contact?.id)) throw new BrevoError('brevo_missing_contact_id');
       await save({ contactId: contact.id });
@@ -93,7 +103,7 @@ export function createBrevoTrialClient({ api = createBrevoApi(), pipelineId = pr
           deal = await api('/crm/deals', 'POST', {
             name: `[PROVA] ${record.kind === 'application' ? 'Candidatura · ' + record.viaggio : 'Contattaci'} · ${record.nome} · ${record.at.slice(0, 10)}`.slice(0, 200),
             linkedContactsIds: [state.contactId], attributes: {
-              pipeline: c.pipeline, deal_stage: c.stage, [c.fields.request]: ref,
+              ...c.placement, [c.fields.request]: ref,
               [c.fields.form]: record.kind === 'application' ? 'Candidatura viaggio' : 'Contattaci',
               [c.fields.trip]: record.viaggio || 'Richiesta generale', [c.fields.date]: record.at,
               [c.fields.phone]: record.telefono || '', [c.fields.people]: record.numero_persone || '',

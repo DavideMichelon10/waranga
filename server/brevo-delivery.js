@@ -20,6 +20,7 @@ export function createBrevoDelivery({ store, client = createBrevoTrialClient(), 
           const code = error instanceof BrevoError ? error.code : 'brevo_delivery_error';
           await checkpoint({ ...receipt, attempts, status: 'queued', code, nextAttemptAt: now() + Math.min(300000, 5000 * 2 ** Math.min(attempts - 1, 6)) });
           console.error('Brevo trial delivery delayed:', code);
+          if (error instanceof BrevoError && error.unauthorizedIp) console.error('Brevo requires authorized server IP:', error.unauthorizedIp);
         }
       }
     });
